@@ -1,26 +1,154 @@
 @import "tailwindcss";
 
+/* =========================
+   BRAND TOKENS
+========================= */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand-yellow: #ffc400;
+  --brand-black: #0b0b0b;
+
+  --radius-lg: 18px;
+  --radius-md: 14px;
+
+  --border: rgba(11, 11, 11, 0.10);
+  --border-strong: rgba(11, 11, 11, 0.16);
+
+  --shadow-lift: 0 22px 60px rgba(0, 0, 0, 0.10);
+  --focus: 0 0 0 4px rgba(255, 196, 0, 0.25);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html,
+body {
+  height: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: var(--brand-black);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Фирменный шрифт заголовков */
+.h-brand,
+h1,
+h2,
+h3 {
+  font-family: var(--font-farabee), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Контейнер */
+.site-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Кнопки */
+.btn-primary {
+  background: var(--brand-yellow);
+  color: #000;
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 10px 24px rgba(255, 196, 0, 0.28);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(255, 196, 0, 0.34);
+}
+
+.btn-outline {
+  background: #ffffff;
+  color: var(--brand-black);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.btn-outline:hover {
+  transform: translateY(-1px);
+  background: var(--brand-black);
+  color: #ffffff;
+}
+
+/* Инпут */
+.input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 14px;
+  outline: none;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--brand-yellow);
+  box-shadow: var(--focus);
+}
+
+/* Хелперы секций */
+.section-dark {
+  background: #0b0b0b;
+  color: #ffffff;
+}
+
+.section-light {
+  background: #ffffff;
+  color: var(--brand-black);
+}
+
+/* =========================
+   ПРЕМИУМ-ЭФФЕКТЫ (лёгкие, без веса)
+========================= */
+
+/* Лёгкая “аура” для hero: только CSS */
+.hero-aurora {
+  position: relative;
+  isolation: isolate;
+}
+.hero-aurora::before {
+  content: "";
+  position: absolute;
+  inset: -140px;
+  background:
+    radial-gradient(520px 520px at 50% 10%, rgba(255, 196, 0, 0.18), rgba(255, 196, 0, 0) 60%),
+    radial-gradient(520px 520px at 10% 30%, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0) 60%),
+    radial-gradient(520px 520px at 90% 35%, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0) 60%);
+  filter: blur(44px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Премиум-карточка */
+.card-premium {
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid rgba(11, 11, 11, 0.10);
+  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.14);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  will-change: transform;
+}
+.card-premium:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 34px 120px rgba(0, 0, 0, 0.18);
+}
+
