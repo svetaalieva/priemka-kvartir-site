@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type City = {
   name: string;
-  x: number; // 0..100
+  x: number; // 0..100 (логические координаты)
   y: number; // 0..100
-  lx: number; // 0..100
+  lx: number; // 0..100 (позиция подписи)
   ly: number; // 0..100
   major?: boolean;
 };
@@ -14,44 +14,66 @@ type City = {
 export default function Geo() {
   const phoneLink = "tel:+79787043316";
 
+  /**
+   * SVG в viewBox 1200 x 640 — есть запас снизу под подписи.
+   */
+  const VB_W = 1200;
+  const VB_H = 640;
+
+  const PAD_TOP = 40;
+  const PAD_BOTTOM = 90;
+  const WORK_H = VB_H - PAD_TOP - PAD_BOTTOM;
+
+  // компенсация под контур (аккуратно)
+  const X_SHIFT = -10;
+  const X_SCALE = 1.02;
+
+  // размеры лейбла (важно для clamp)
+  const LABEL_W = 164;
+  const LABEL_H = 38;
+  const LABEL_PAD = 14;
+
   const cities = useMemo<City[]>(
     () => [
       // Запад
-      { name: "Черноморское", x: 10, y: 40, lx: 10, ly: 22 },
-      { name: "Евпатория", x: 20, y: 52, lx: 18, ly: 62, major: true },
-      { name: "Саки", x: 26, y: 55, lx: 28, ly: 72 },
-      { name: "Раздольное", x: 18, y: 34, lx: 14, ly: 16 },
+      // ✅ поправлено: чтобы не "уезжало"
+      { name: "Черноморское", x: 12, y: 62, lx: 16, ly: 24 },
+      { name: "Евпатория", x: 19, y: 60, lx: 16, ly: 64, major: true },
+      { name: "Саки", x: 25, y: 56, lx: 28, ly: 73 },
+      { name: "Раздольное", x: 18, y: 35, lx: 14, ly: 18 },
+
+      // Север / перешеек
+      { name: "Армянск", x: 26, y: 20, lx: 18, ly: 8 },
+      { name: "Красноперекопск", x: 32, y: 23, lx: 30, ly: 10 },
+      { name: "Джанкой", x: 45, y: 30, lx: 49, ly: 10, major: true },
+
+      // Центр
+      { name: "Симферополь", x: 44, y: 56, lx: 48, ly: 62, major: true },
+      { name: "Белогорск", x: 54, y: 56, lx: 66, ly: 45 },
+      { name: "Нижнегорский", x: 62, y: 42, lx: 78, ly: 28 },
 
       // Юго-запад
-      { name: "Севастополь", x: 26, y: 66, lx: 24, ly: 84, major: true },
-      { name: "Балаклава", x: 28, y: 71, lx: 34, ly: 96 },
-      { name: "Инкерман", x: 28, y: 63, lx: 36, ly: 78 },
-      { name: "Бахчисарай", x: 34, y: 59, lx: 40, ly: 48 },
-      { name: "Николаевка", x: 33, y: 66, lx: 46, ly: 88 },
-      { name: "Форос", x: 40, y: 79, lx: 44, ly: 104 },
-
-      // Центр/север
-      { name: "Симферополь", x: 42, y: 56, lx: 46, ly: 62, major: true },
-      { name: "Джанкой", x: 44, y: 28, lx: 48, ly: 12, major: true },
-      { name: "Красноперекопск", x: 32, y: 22, lx: 30, ly: 6 },
-      { name: "Армянск", x: 28, y: 18, lx: 18, ly: 4 },
-
-      // Восток
-      { name: "Белогорск", x: 52, y: 55, lx: 64, ly: 42 },
-      { name: "Нижнегорский", x: 60, y: 40, lx: 76, ly: 26 },
-      { name: "Феодосия", x: 84, y: 58, lx: 92, ly: 48, major: true },
-      { name: "Коктебель", x: 82, y: 61, lx: 96, ly: 62 },
-      { name: "Судак", x: 78, y: 66, lx: 94, ly: 80 },
-      { name: "Ленино", x: 88, y: 38, lx: 96, ly: 22 },
-      { name: "Керчь", x: 96, y: 46, lx: 104, ly: 36, major: true },
+      { name: "Севастополь", x: 26, y: 68, lx: 24, ly: 86, major: true },
+      { name: "Инкерман", x: 29, y: 64, lx: 37, ly: 78 },
+      { name: "Балаклава", x: 29, y: 72, lx: 36, ly: 98 },
+      { name: "Бахчисарай", x: 36, y: 60, lx: 42, ly: 50 },
+      { name: "Николаевка", x: 34, y: 67, lx: 46, ly: 90 },
+      { name: "Форос", x: 41, y: 80, lx: 45, ly: 106 },
 
       // ЮБК
-      { name: "Ялта", x: 60, y: 74, lx: 58, ly: 102, major: true },
-      { name: "Симеиз", x: 50, y: 79, lx: 54, ly: 112 },
-      { name: "Алупка", x: 54, y: 77, lx: 66, ly: 112 },
-      { name: "Гурзуф", x: 64, y: 70, lx: 84, ly: 96 },
-      { name: "Партенит", x: 66, y: 67, lx: 92, ly: 86 },
-      { name: "Алушта", x: 70, y: 64, lx: 98, ly: 66, major: true },
+      { name: "Симеиз", x: 50, y: 80, lx: 54, ly: 112 },
+      { name: "Алупка", x: 54, y: 78, lx: 66, ly: 112 },
+      { name: "Ялта", x: 60, y: 75, lx: 58, ly: 104, major: true },
+      { name: "Гурзуф", x: 64, y: 71, lx: 84, ly: 98 },
+      { name: "Партенит", x: 66, y: 68, lx: 92, ly: 88 },
+
+      // ✅ Восточные города — разведены и подписи уводим левее
+      { name: "Алушта", x: 70, y: 65, lx: 88, ly: 72, major: true },
+      { name: "Феодосия", x: 84, y: 58, lx: 90, ly: 54, major: true },
+      { name: "Коктебель", x: 82, y: 61, lx: 96, ly: 64 },
+      { name: "Судак", x: 78, y: 66, lx: 94, ly: 82 },
+      { name: "Ленино", x: 89, y: 40, lx: 98, ly: 26 },
+      { name: "Керчь", x: 96, y: 48, lx: 92, ly: 40, major: true },
     ],
     []
   );
@@ -73,7 +95,7 @@ export default function Geo() {
         const bs = b.name.toLowerCase().startsWith(query) ? -1 : 0;
         return as - bs || a.name.localeCompare(b.name, "ru");
       });
-    return res.slice(0, 8);
+    return res.slice(0, 10);
   }, [cities, query]);
 
   const matchSet = useMemo(() => {
@@ -100,19 +122,17 @@ export default function Geo() {
 
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
+  const mapX = (x: number) => ((x / 100) * VB_W) * X_SCALE + X_SHIFT;
+  const mapY = (y: number) => PAD_TOP + (y / 100) * WORK_H;
+
   const applyTransform = (extra: { px: number; py: number } = { px: 0, py: 0 }) => {
     const g = gRef.current;
     if (!g) return;
 
     const cam = camRef.current;
-    const px = extra.px;
-    const py = extra.py;
-
-    // итог: сначала камера (пан/зум), сверху лёгкий параллакс
-    // translate(px,py) делаем ПОСЛЕ камеры, чтобы было “живое” ощущение
     g.setAttribute(
       "transform",
-      `translate(${cam.x} ${cam.y}) scale(${cam.s}) translate(${px} ${py})`
+      `translate(${cam.x} ${cam.y}) scale(${cam.s}) translate(${extra.px} ${extra.py})`
     );
   };
 
@@ -155,20 +175,15 @@ export default function Geo() {
     const c = cities.find((x) => x.name === name);
     if (!c) return;
 
-    // координаты точки в системе viewBox
-    const cx = (c.x / 100) * 1200;
-    const cy = (c.y / 100) * 560;
+    const cx = mapX(c.x);
+    const cy = mapY(c.y);
 
-    // целевая “камера”: лёгкий зум и центрирование
     const s = 1.12;
+    const tx = VB_W / 2 - cx * s;
+    const ty = (VB_H / 2 - 30) - cy * s;
 
-    // хотим, чтобы (cx,cy) оказался около центра (600,280)
-    const tx = 600 - cx * s;
-    const ty = 280 - cy * s;
-
-    // ограничим, чтобы карту не уводило слишком сильно
-    const limX = 220;
-    const limY = 120;
+    const limX = 240;
+    const limY = 160;
 
     animateCameraTo(clamp(tx, -limX, limX), clamp(ty, -limY, limY), s);
   };
@@ -180,23 +195,12 @@ export default function Geo() {
     animateCameraTo(0, 0, 1);
   };
 
- const emitCityToForm = (city: string) => {
-  // кидаем событие для page.tsx
-  window.dispatchEvent(new CustomEvent("geo:city", { detail: { city } }));
-
-  // мягко прокрутим к форме
-  const el = document.getElementById("form");
-  el?.scrollIntoView({ behavior: "smooth", block: "start" });
-};
-
-const selectCity = (name: string) => {
-  setActive(name);
-  setQ(name);
-  setOpen(false);
-  focusCity(name);
-
-  emitCityToForm(name);
-};
+  const selectCity = (name: string) => {
+    setActive(name);
+    setQ(name);
+    setOpen(false);
+    focusCity(name);
+  };
 
   // reveal on scroll
   useEffect(() => {
@@ -207,7 +211,7 @@ const selectCity = (name: string) => {
       ([e]) => {
         if (e.isIntersecting) setInView(true);
       },
-      { threshold: 0.18 }
+      { threshold: 0.16 }
     );
 
     io.observe(el);
@@ -265,6 +269,7 @@ const selectCity = (name: string) => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (camAnimRef.current) cancelAnimationFrame(camAnimRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // если пользователь чистит поиск — сбрасываем актив и камеру
@@ -278,8 +283,9 @@ const selectCity = (name: string) => {
 
   return (
     <section id="geo" className="relative bg-white">
+      {/* внешняя мягкая подсветка */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-32 top-0 h-140 w-140 rounded-full bg-[#ffc400]/10 blur-3xl" />
+        <div className="absolute -right-32 top-0 h-140 w-140 rounded-full bg-[#ffc400]/12 blur-3xl" />
         <div className="absolute -left-40 bottom-0 h-140 w-140 rounded-full bg-black/5 blur-3xl" />
       </div>
 
@@ -290,7 +296,7 @@ const selectCity = (name: string) => {
             Работаем по всему <span className="text-[#ffc400]">Крыму</span>
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-black/60">
-            Найди город — камера мягко сфокусируется на точке. На телефоне — просто тап по точке.
+            Найди город — камера мягко сфокусируется на точке. На телефоне — тап по точке.
           </p>
         </div>
 
@@ -363,7 +369,7 @@ const selectCity = (name: string) => {
                   ) : (
                     <div className="px-4 py-3 text-sm text-black/55">
                       Ничего не найдено. Попробуй: <span className="font-bold">Симферополь</span>,{" "}
-                      <span className="font-bold">Ялта</span>.
+                      <span className="font-bold">Севастополь</span>.
                     </div>
                   )}
                 </div>
@@ -378,19 +384,30 @@ const selectCity = (name: string) => {
           <div className="px-4 pb-4 pt-5 md:px-8 md:pb-8">
             <div
               className={[
-                "relative overflow-hidden rounded-2xl border border-black/10 bg-black/[0.02]",
-                "transition hover:shadow-[0_22px_70px_rgba(0,0,0,0.10)]",
+                "relative overflow-hidden rounded-2xl border border-black/10",
+                "bg-black/[0.02] transition hover:shadow-[0_22px_70px_rgba(0,0,0,0.10)]",
               ].join(" ")}
               onMouseLeave={() => setActive("")}
             >
-              <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#ffc400]/14 blur-3xl" />
+              {/* МОРЕ */}
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute inset-0 bg-linear-to-br from-[#fff] via-[#fff] to-[#ffc400]/10" />
+                <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-[#ffc400]/10 blur-3xl" />
+                <div className="absolute -right-40 top-10 h-120 w-120 rounded-full bg-black/5 blur-3xl" />
+                <div className="absolute left-1/2 top-[35%] h-72 w-[55rem] -translate-x-1/2 rounded-full bg-white/60 blur-2xl" />
+              </div>
 
-              <div className="px-5 pt-5">
-                <svg viewBox="0 0 1200 560" className="h-[380px] w-full md:h-[460px]" role="img" aria-label="Карта Крыма">
+              <div className="px-5 pt-5 relative">
+                <svg
+                  viewBox={`0 0 ${VB_W} ${VB_H}`}
+                  className="h-[400px] w-full md:h-[520px]"
+                  role="img"
+                  aria-label="Карта Крыма"
+                >
                   <defs>
                     <linearGradient id="land" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0" stopColor="rgba(0,0,0,0.14)" />
-                      <stop offset="1" stopColor="rgba(0,0,0,0.05)" />
+                      <stop offset="0" stopColor="rgba(0,0,0,0.16)" />
+                      <stop offset="1" stopColor="rgba(0,0,0,0.06)" />
                     </linearGradient>
 
                     <radialGradient id="glow" cx="50%" cy="50%" r="55%">
@@ -408,27 +425,44 @@ const selectCity = (name: string) => {
                   </defs>
 
                   <g ref={gRef}>
+                    {/* КОНТУР */}
                     <g filter="url(#shadow)">
                       <path
-                        d="M130 280
-                           C170 170, 340 115, 485 145
-                           C575 75, 740 70, 870 120
-                           C995 170, 1090 215, 1140 250
-                           C1180 280, 1160 350, 1120 380
-                           C1050 430, 1000 470, 930 495
-                           C820 535, 665 525, 545 490
-                           C465 466, 395 470, 305 500
-                           C220 530, 150 490, 125 445
-                           C106 410, 92 365, 130 280 Z"
+                        d="
+                          M 250 130
+                          C 238 120, 215 118, 195 130
+                          C 165 148, 150 176, 160 206
+                          C 168 232, 190 252, 214 266
+                          C 182 282, 150 306, 138 340
+                          C 126 376, 140 418, 170 452
+                          C 205 492, 260 520, 330 534
+                          C 405 550, 485 544, 555 526
+                          C 615 510, 675 512, 740 526
+                          C 820 544, 900 544, 970 524
+                          C 1040 504, 1100 468, 1140 430
+                          C 1166 406, 1182 382, 1188 356
+                          C 1196 320, 1184 292, 1158 272
+                          C 1128 248, 1080 224, 1024 200
+                          C 948 168, 860 148, 780 144
+                          C 700 140, 635 154, 585 176
+                          C 558 138, 512 116, 455 114
+                          C 392 112, 332 126, 280 156
+                          C 270 148, 260 140, 250 130
+                          Z
+                        "
                         fill="url(#land)"
                         stroke="rgba(0,0,0,0.18)"
                         strokeWidth="2"
                       />
+
+                      {/* ЮБК пунктир */}
                       <path
-                        d="M230 448
-                           C360 510, 520 490, 615 460
-                           C705 432, 825 470, 930 450
-                           C1035 430, 1100 372, 1120 320"
+                        d="
+                          M 250 476
+                          C 340 516, 450 500, 555 476
+                          C 660 452, 760 486, 860 468
+                          C 980 446, 1085 398, 1140 340
+                        "
                         fill="none"
                         stroke="rgba(255,196,0,0.45)"
                         strokeWidth="2"
@@ -437,11 +471,26 @@ const selectCity = (name: string) => {
                       />
                     </g>
 
+                    {/* ГОРОДА */}
                     {cities.map((c) => {
-                      const cx = (c.x / 100) * 1200;
-                      const cy = (c.y / 100) * 560;
-                      const lx = (c.lx / 100) * 1200;
-                      const ly = (c.ly / 100) * 560;
+                      const cx = mapX(c.x);
+                      const cy = mapY(c.y);
+
+                      // сырая позиция лейбла
+                      const lxRaw = mapX(c.lx);
+                      const lyRaw = mapY(c.ly);
+
+                      // clamp центра лейбла (чтобы не обрезался)
+                      const lxc = clamp(lxRaw, LABEL_W / 2 + LABEL_PAD, VB_W - LABEL_W / 2 - LABEL_PAD);
+                      const lyc = clamp(lyRaw, LABEL_H / 2 + LABEL_PAD, VB_H - LABEL_H / 2 - LABEL_PAD);
+
+                      // умная сторона (чтобы справа не слипалось и не обрезалось)
+                      const side = lxRaw > VB_W - 120 ? "right" : lxRaw < 120 ? "left" : "center";
+
+                      const rectX =
+                        side === "right" ? lxc - LABEL_W : side === "left" ? lxc : lxc - LABEL_W / 2;
+                      const textX = side === "right" ? lxc - 12 : side === "left" ? lxc + 12 : lxc;
+                      const anchor = side === "right" ? "end" : side === "left" ? "start" : "middle";
 
                       const isActive = active === c.name;
                       const showLabel = Boolean(c.major) || isActive;
@@ -449,7 +498,7 @@ const selectCity = (name: string) => {
                       const isMatch = query ? matchSet.has(c.name) : true;
                       const baseOpacity = query ? (isMatch ? 1 : 0.22) : 1;
 
-                      const dashLen = 140;
+                      const dashLen = 150;
 
                       return (
                         <g
@@ -458,18 +507,25 @@ const selectCity = (name: string) => {
                           onClick={() => selectCity(c.name)}
                           style={{ cursor: "pointer", opacity: baseOpacity }}
                         >
-                          <circle cx={cx} cy={cy} r={isActive ? 40 : 28} fill="url(#glow)" opacity={isActive ? 1 : 0.7} />
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={isActive ? 44 : 30}
+                            fill="url(#glow)"
+                            opacity={isActive ? 1 : 0.72}
+                          />
 
                           <circle
                             cx={cx}
                             cy={cy}
-                            r={isActive ? 7.8 : 6.2}
+                            r={isActive ? 8.2 : 6.3}
                             fill="#ffc400"
                             stroke={isActive ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.35)"}
                             strokeWidth="2"
                             className={isActive ? "geo-dot geo-dot--active" : "geo-dot"}
                           />
 
+                          {/* ЛЕЙБЛЫ */}
                           <g
                             style={{
                               opacity: showLabel ? 1 : 0,
@@ -477,8 +533,9 @@ const selectCity = (name: string) => {
                               transformOrigin: `${cx}px ${cy}px`,
                             }}
                           >
+                            {/* линия тоже на lxc/lyc */}
                             <path
-                              d={`M ${cx} ${cy} L ${lx} ${ly}`}
+                              d={`M ${cx} ${cy} L ${lxc} ${lyc}`}
                               stroke={isActive ? "rgba(0,0,0,0.48)" : "rgba(0,0,0,0.24)"}
                               strokeWidth={isActive ? 2.2 : 1.6}
                               strokeLinecap="round"
@@ -489,20 +546,22 @@ const selectCity = (name: string) => {
                             />
 
                             <g filter="url(#soft)" className={isActive ? "geo-label geo-label--active" : "geo-label"}>
+                              {/* ✅ rect на lxc/lyc */}
                               <rect
-                                x={lx - 78}
-                                y={ly - 18}
+                                x={rectX}
+                                y={lyc - 19}
                                 rx={18}
                                 ry={18}
-                                width={156}
-                                height={36}
+                                width={LABEL_W}
+                                height={LABEL_H}
                                 fill={isActive ? "rgba(255,255,255,0.98)" : "rgba(255,255,255,0.92)"}
                                 stroke="rgba(0,0,0,0.10)"
                               />
+                              {/* ✅ text на lxc/lyc */}
                               <text
-                                x={lx}
-                                y={ly + 6}
-                                textAnchor="middle"
+                                x={textX}
+                                y={lyc + 7}
+                                textAnchor={anchor as any}
                                 fontSize="16"
                                 fontWeight="900"
                                 fill={isActive ? "rgba(0,0,0,0.88)" : "rgba(0,0,0,0.78)"}
@@ -519,7 +578,7 @@ const selectCity = (name: string) => {
                 </svg>
               </div>
 
-              <div className="flex items-center justify-between px-5 pb-5 text-xs text-black/45">
+              <div className="flex items-center justify-between px-5 pb-5 text-xs text-black/45 relative">
                 <span>Схема региона</span>
                 <span className="inline-flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#ffc400]" />
