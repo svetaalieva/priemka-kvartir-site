@@ -1,0 +1,17 @@
+{
+  "tailwindCSS.lint.className": "ignore",
+  "tailwindCSS.lint.cssConflict": "ignore",
+  "tailwindCSS.lint.invalidApply": "ignore",
+  "tailwindCSS.lint.invalidScreen": "ignore",
+  "tailwindCSS.lint.invalidVariant": "ignore",
+  "tailwindCSS.lint.recommendedVariantOrder": "ignore",
+  "tailwindCSS.lint.suggestedVariantOrder": "ignore",
+
+  "eslint.rules.customizations": [
+    { "rule": "tailwindcss/suggestCanonicalClasses", "severity": "off" },
+    { "rule": "suggestCanonicalClasses", "severity": "off" },
+    { "rule": "*suggestCanonicalClasses*", "severity": "off" }
+  ],
+
+  "eslint.quiet": true
+}

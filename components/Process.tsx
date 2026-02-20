@@ -1,96 +1,253 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
+
 /**
- * Process.tsx — ПРЕМИУМ-ВЕРСИЯ
- * Цель: меньше “серых карточек”, больше премиум-иерархии.
- * - шаги как “timeline”
- * - правая заявка — как аккуратный callout (без ощущения рекламы)
+ * Process.tsx — ДОРОГОЙ ВАРИАНТ (исправленный под ESLint)
+ *
+ * ✅ Плавная анимация появления шагов при скролле (IntersectionObserver)
+ * ✅ Лёгкий параллакс (мягкое смещение декоративных кругов)
+ * ✅ Микро-анимация hover
+ * ✅ Номера в бренд-цвете
+ *
+ * ✅ Исправлено:
+ * - нет setState “синхронно” внутри effect (через rAF)
+ * - нет any в ref
  */
 
-const steps = [
-  { n: "01", title: "Заявка", text: "Оставляете заявку — уточняем город, ЖК, удобное время и задачи." },
-  { n: "02", title: "Выезд и проверка", text: "Осмотр по чек-листу: отделка, инженерия, геометрия, площадь (при необходимости)." },
-  { n: "03", title: "Фиксация дефектов", text: "Фото/видео + понятные комментарии. Ничего не теряется и не “на словах”." },
-  { n: "04", title: "Документ для застройщика", text: "Готовим акт замечаний, с которым проще требовать устранения дефектов." },
+const stepsData = [
+  {
+    title: "Созваниваемся и уточняем объект",
+    text: "Город, ЖК, площадь и удобная дата. Подсказываем, что подготовить к приёмке.",
+  },
+  {
+    title: "Проводим проверку на месте",
+    text: "Отделка, инженерия, окна/двери, ключевые замеры. Всё фиксируем фото/видео.",
+  },
+  {
+    title: "Составляем акт замечаний",
+    text: "Формулируем по факту: что не так, где и почему это важно. Ничего лишнего.",
+  },
+  {
+    title: "Контроль устранения (по желанию)",
+    text: "Повторная приёмка: проверяем, что замечания действительно устранены.",
+  },
 ];
 
+function useInViewCount(total: number) {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    let raf = 0;
+
+    // Если нет IntersectionObserver — просто показываем всё (НО через rAF, чтобы ESLint не ругался)
+    if (typeof IntersectionObserver === "undefined") {
+      raf = requestAnimationFrame(() => setVisibleCount(total));
+      return () => cancelAnimationFrame(raf);
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          const idx = Number((e.target as HTMLElement).dataset.index || 0);
+
+          // через rAF — чтобы не было “синхронного” setState внутри callback-а observer
+          raf = requestAnimationFrame(() => {
+            setVisibleCount((prev) => Math.max(prev, idx + 1));
+          });
+        });
+      },
+      { root: null, threshold: 0.2 }
+    );
+
+    itemRefs.current.forEach((el) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [total]);
+
+  return { visibleCount, itemRefs };
+}
+
 export default function Process() {
+  const steps = useMemo(() => stepsData, []);
+  const { visibleCount, itemRefs } = useInViewCount(steps.length);
+
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [parallax, setParallax] = useState({ a: 0, b: 0 });
+
+  useEffect(() => {
+    let raf = 0;
+
+    const calc = () => {
+      const el = sectionRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const viewportH = window.innerHeight || 1;
+
+      const center = rect.top + rect.height / 2;
+      const t = (center - viewportH / 2) / (viewportH / 2);
+      const clamped = Math.max(-1, Math.min(1, t));
+
+      setParallax({
+        a: clamped * 10,
+        b: clamped * -14,
+      });
+    };
+
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(calc);
+    };
+
+    // Первый расчёт тоже через rAF
+    raf = requestAnimationFrame(calc);
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
   return (
-    <section id="process" className="relative bg-white">
-      {/* мягкий фон (дороже, но тихо) */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 right-1/4 h-96 w-96 rounded-full bg-[#ffc400]/10 blur-3xl" />
-        <div className="absolute -bottom-24 -left-16 h-96 w-96 rounded-full bg-black/5 blur-3xl" />
-      </div>
+    <section ref={sectionRef} className="section-light" id="process">
+      <div className="site-container py-12 md:py-16">
+        {/* Заголовок */}
+        <div className="max-w-2xl">
+          <div className="text-sm font-semibold tracking-wide text-black/60">Как работаем</div>
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
+            Понятный процесс в 4 шага
+          </h2>
+          <p className="mt-3 text-black/70 md:text-lg">
+            Договорились → проверили → зафиксировали → оформили.
+          </p>
+        </div>
 
-      <div className="site-container relative py-20 md:py-24">
-        <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_520px] md:items-start">
-          {/* LEFT */}
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-extrabold text-white">
-              <span className="inline-block h-2 w-2 rounded-full bg-[#ffc400]" />
-              Как работаем
-            </div>
+        <div className="relative mt-10 grid gap-8 lg:grid-cols-2 lg:items-start">
+          {/* Декор (параллакс) */}
+          <div
+            className="pointer-events-none absolute -left-10 -top-10 h-44 w-44 rounded-full bg-black/[0.03] blur-3xl"
+            style={{ transform: `translateY(${parallax.a}px)` }}
+          />
+          <div
+            className="pointer-events-none absolute -right-12 -bottom-16 h-56 w-56 rounded-full bg-[var(--brand-yellow)]/15 blur-3xl"
+            style={{ transform: `translateY(${parallax.b}px)` }}
+          />
 
-            <h2 className="mt-5 text-3xl font-extrabold tracking-tight md:text-4xl">
-              Быстро. Чётко. <span className="text-[#ffc400]">С фиксацией.</span>
-            </h2>
+          {/* Левая колонка */}
+          <div className="relative">
+            <div className="pointer-events-none absolute left-[15px] top-1 bottom-1 w-px bg-black/10" />
 
-            <p className="mt-4 max-w-xl text-black/60">
-              Главная цель — чтобы у вас были аргументы и документ, который действительно работает.
-            </p>
+            <div className="space-y-6">
+              {steps.map((s, i) => {
+                const show = i < visibleCount;
+                const delay = i * 90;
 
-            {/* timeline */}
-            <div className="mt-10 space-y-6">
-              {steps.map((s, idx) => (
-                <div key={s.n} className="relative pl-12">
-                  {/* линия */}
-                  <div className="absolute left-4 top-0 h-full w-px bg-black/10" />
-                  {/* точка */}
-                  <div className="absolute left-2.25 top-1.5 h-3 w-3 rounded-full bg-[#ffc400]" />
+                return (
+                  <div
+                    key={s.title}
+                    data-index={i}
+                    ref={(el) => {
+                      itemRefs.current[i] = el;
+                    }}
+                    className="relative pl-12"
+                    style={{
+                      opacity: show ? 1 : 0,
+                      transform: show ? "translateY(0px)" : "translateY(14px)",
+                      transition:
+                        "opacity 520ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+                      transitionDelay: `${delay}ms`,
+                      willChange: "transform, opacity",
+                    }}
+                  >
+                    {/* Маркер слева */}
+                    <div className="absolute left-0 top-1">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-black/15 bg-white shadow-sm">
+                        <span className="text-[11px] font-extrabold text-black">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                      </div>
+                    </div>
 
+                    {/* Карточка */}
+                    <div className="group rounded-3xl border border-black/10 bg-white p-6 shadow-[0_14px_45px_rgba(0,0,0,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(0,0,0,0.10)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="text-base font-extrabold">{s.title}</div>
 
-                  <div className="rounded-3xl bg-white p-6 shadow-[0_14px_45px_rgba(0,0,0,0.06)] ring-1 ring-black/10">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-xs font-extrabold text-black/40">ШАГ {s.n}</div>
-                        <div className="mt-2 text-lg font-extrabold">{s.title}</div>
-                        <div className="mt-2 text-sm leading-relaxed text-black/60">{s.text}</div>
+                        {/* Номер в бренд-цвете */}
+                        <div className="whitespace-nowrap rounded-full border border-black/10 bg-[var(--brand-yellow)] px-3 py-1 text-[11px] font-extrabold text-black shadow-[0_10px_24px_rgba(255,196,0,0.18)]">
+                          {String(i + 1).padStart(2, "0")}
+                        </div>
                       </div>
 
-                      {/* маленький номер как “маркер” */}
-                      <div className="shrink-0 rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white">
-                        {idx + 1}
+                      <div className="mt-2 text-sm text-black/70">{s.text}</div>
+
+                      {/* микро-индикатор hover */}
+                      <div className="mt-5 h-px w-full bg-black/5">
+                        <div className="h-px w-0 bg-black/20 transition-all duration-300 group-hover:w-2/3" />
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* RIGHT — callout */}
-          <div className="relative">
-            {/* подложка — вокруг, не “таблично” */}
-            <div className="absolute -left-4 top-4 h-[calc(100%-16px)] w-[calc(100%+16px)] rounded-3xl bg-[#ffc400]" />
+          {/* Правая колонка — Принципы */}
+          <div className="relative overflow-hidden rounded-3xl border border-black/10 bg-white p-7 shadow-[0_14px_45px_rgba(0,0,0,0.06)]">
+            <div
+              className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--brand-yellow)]/12 blur-3xl"
+              style={{ transform: `translateY(${parallax.a * 0.6}px)` }}
+            />
+            <div
+              className="pointer-events-none absolute -left-20 -bottom-20 h-56 w-56 rounded-full bg-black/[0.03] blur-3xl"
+              style={{ transform: `translateY(${parallax.b * 0.4}px)` }}
+            />
 
-            <div className="relative rounded-3xl bg-white p-8 shadow-[0_22px_70px_rgba(0,0,0,0.12)] ring-1 ring-black/10">
-              <div className="text-xl font-extrabold">Оставить заявку</div>
-              <p className="mt-3 text-sm leading-relaxed text-black/60">
-                Напишите город и ЖК — подскажем, как подготовиться и что проверить в первую очередь.
-              </p>
+            <div className="relative">
+              <div className="text-sm font-semibold tracking-wide text-black/60">Принципы</div>
+              <div className="mt-2 text-2xl font-extrabold tracking-tight">
+                Спокойно, понятно, по делу
+              </div>
 
-              <div className="mt-7 grid gap-3">
-                <a href="#form" className="btn-primary w-full text-center">
-                  Записаться
+              <ul className="mt-6 space-y-3 text-sm text-black/75">
+                {[
+                  "Говорим человеческим языком, без «воды».",
+                  "Фиксируем замечания так, чтобы застройщик не уходил в споры.",
+                  "Фото/видео — чтобы у вас были доказательства.",
+                  "Если нужно — проверим устранение на повторной приёмке.",
+                ].map((x) => (
+                  <li key={x} className="flex gap-2">
+                    <span className="mt-[2px] inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/5 border border-black/10 text-xs font-black">
+                      ✓
+                    </span>
+                    <span>{x}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-7 flex flex-wrap gap-3">
+                <a href="#lead" className="btn-primary transition hover:-translate-y-[1px]">
+                  Оставить заявку
                 </a>
-                <a href="tel:+79787043316" className="btn-outline w-full text-center">
-                  Позвонить: +7 (978) 704-33-16
+                <a href="#docs" className="btn-outline transition hover:-translate-y-[1px]">
+                  Документы
                 </a>
               </div>
 
-              <div className="mt-6 rounded-2xl bg-black/3 p-4 text-xs text-black/70 ring-1 ring-black/10">
-                <span className="font-extrabold text-black">Крым:</span> Севастополь, Симферополь, Ялта, Алушта и др.
+              <div className="mt-6 text-xs text-black/50">
+                * Если нужно — объясним, как правильно передать акт застройщику.
               </div>
             </div>
           </div>

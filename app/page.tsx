@@ -1,18 +1,58 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useId } from "react";
 
 import Advantages from "@/components/Advantages";
 import Services from "@/components/Services";
 import Process from "@/components/Process";
 import Docs from "@/components/Docs";
+import Geo from "@/components/Geo";
+import FAQ from "@/components/FAQ";
+import Footer from "@/components/Footer";
 
 type Social = {
   name: string;
   href: string;
   icon: "tg" | "vk" | "ig";
 };
+
+type FormState = {
+  name: string;
+  phone: string;
+  city: string;
+  comment: string;
+};
+
+type FormErrors = Partial<Record<keyof FormState, string>>;
+
+const maskPhone = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  let d = digits;
+  if (d.startsWith("8")) d = "7" + d.slice(1);
+  if (d.startsWith("9")) d = "7" + d;
+
+  // если вообще ничего — разрешаем пустое
+  if (!d.length) return "";
+
+  const p = d.startsWith("7") ? d.slice(1) : d; // всё кроме ведущей 7
+  const a = p.slice(0, 3);
+  const b = p.slice(3, 6);
+  const c = p.slice(6, 8);
+  const e = p.slice(8, 10);
+
+  let out = "+7";
+  if (a.length) out += ` (${a}`;
+  if (a.length === 3) out += `)`;
+  if (b.length) out += ` ${b}`;
+  if (c.length) out += `-${c}`;
+  if (e.length) out += `-${e}`;
+
+  return out;
+};
+
+const phoneDigitsCount = (masked: string) => masked.replace(/\D/g, "").length;
 
 export default function Home() {
   const phoneDisplay = "+7 (978) 704-33-16";
@@ -29,6 +69,110 @@ export default function Home() {
   );
 
   const [mobileMenu, setMobileMenu] = useState(false);
+
+  // ===== FORM =====
+  const [form, setForm] = useState<FormState>({
+    name: "",
+    phone: "",
+    city: "",
+    comment: "",
+  });
+
+  const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [sending, setSending] = useState(false);
+  const [sentOk, setSentOk] = useState<null | "ok" | "err">(null);
+
+  const formId = useId();
+
+  const validate = (s: FormState): FormErrors => {
+    const e: FormErrors = {};
+
+    if (!s.name.trim()) e.name = "Введите имя (можно коротко).";
+
+    const digits = phoneDigitsCount(s.phone);
+    // для РФ: +7 + 10 цифр = 11 всего (включая 7)
+    if (digits > 0 && digits < 11) e.phone = "Телефон выглядит неполным.";
+    if (digits === 0) e.phone = "Нужен номер телефона для связи.";
+
+    if (!s.city.trim()) e.city = "Укажите город/ЖК — так быстрее согласуем выезд.";
+
+    // comment — не обязателен
+    return e;
+  };
+
+  const softFieldClass = (field: keyof FormState) => {
+    const hasErr = !!errors[field] && !!touched[field];
+    return [
+      "w-full rounded-2xl border bg-white px-4 py-4 text-base text-black outline-none",
+      "transition duration-300",
+      hasErr
+        ? "border-black/15 shadow-[0_0_0_6px_rgba(0,0,0,0.04)]"
+        : "border-black/10 hover:border-black/15 focus:border-black/20 focus:shadow-[0_0_0_6px_rgba(255,196,0,0.18)]",
+    ].join(" ");
+  };
+
+  const submit = async () => {
+    setSentOk(null);
+
+    const nextErrors = validate(form);
+    setErrors(nextErrors);
+    setTouched({ name: true, phone: true, city: true, comment: true });
+
+    if (Object.keys(nextErrors).length) return;
+
+    try {
+      setSending(true);
+
+      const res = await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          city: form.city.trim(),
+          comment: form.comment.trim(),
+          page: typeof window !== "undefined" ? window.location.href : "",
+        }),
+      });
+
+      if (!res.ok) throw new Error("bad_response");
+      setSentOk("ok");
+
+      // лёгкий UX: чуть подчистим, но оставим город — чаще его вводят с картой
+      setForm((s) => ({ ...s, name: "", phone: "", comment: "" }));
+      setTouched({});
+      setErrors({});
+    } catch {
+      setSentOk("err");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ===== AUTO-FILL CITY FROM GEO (через CustomEvent) =====
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const e = evt as CustomEvent<{ city?: string }>;
+      const city = e.detail?.city?.trim();
+      if (!city) return;
+
+      setForm((s) => ({ ...s, city }));
+      setTouched((t) => ({ ...t, city: true }));
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.city;
+        return copy;
+      });
+
+      // мягкий скролл к форме — “вау”-эффект
+      const el = document.getElementById("form");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    window.addEventListener("geo:city", handler as EventListener);
+    return () => window.removeEventListener("geo:city", handler as EventListener);
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -201,7 +345,6 @@ export default function Home() {
       <main>
         {/* HERO */}
         <section className="relative bg-white pt-6 md:pt-8">
-          {/* лёгкий фон (только CSS) */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute -top-28 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-[#ffc400]/16 blur-3xl" />
             <div className="absolute -top-32 -left-24 h-105 w-105 rounded-full bg-black/5 blur-3xl" />
@@ -209,15 +352,9 @@ export default function Home() {
             <div className="absolute inset-x-0 top-0 h-20 bg-linear-to-b from-white via-white to-transparent" />
           </div>
 
-          {/* ВАЖНО:
-              - Отступ от чёрной навигации делаем через padding секции (pt-6/pt-8)
-              - Пилюли и рамка фото стартуют с одной линии (items-start + без отрицательных margin)
-          */}
           <div className="site-container relative pb-16 md:pb-24">
             <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_380px] md:items-start">
-              {/* ЛЕВО */}
               <div>
-                {/* Пилюльки (подняты максимально “вверх”, но с безопасным отступом от навигации) */}
                 <div className="flex flex-wrap gap-3">
                   <span className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
                     Работаем по всему Крыму
@@ -258,16 +395,13 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ПРАВО — рамка фото на уровне пилюль, фото меньше */}
               <div className="relative mx-auto w-full max-w-95">
-                {/* жёлтый акцент */}
                 <div className="absolute -left-3 top-3 h-[calc(100%-12px)] w-[calc(100%+12px)] rounded-3xl bg-[#ffc400]" />
 
                 <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_22px_70px_rgba(0,0,0,0.14)] ring-1 ring-black/10">
                   <div className="p-4 md:p-5">
                     <div className="mx-auto w-full max-w-85">
                       <div className="relative overflow-hidden rounded-3xl bg-black/5">
-                        {/* ВАЖНО: без query-string, чтобы Next/Image не падал */}
                         <Image
                           src="/brand/sergey.jpg"
                           alt="Негода Сергей Владимирович"
@@ -295,87 +429,240 @@ export default function Home() {
         </section>
 
         <div className="h-10 md:h-14" />
-
         <Advantages />
 
         <div className="h-10 md:h-14" />
-
         <Services />
 
         <div className="h-10 md:h-14" />
-
         <Process />
 
+        {/* порядок */}
         <div className="h-10 md:h-14" />
+        <Geo />
 
+        <div className="h-10 md:h-14" />
         <Docs />
 
         <div className="h-10 md:h-14" />
+        <FAQ />
 
-        {/* FAQ */}
-        <section id="faq" className="bg-white">
-          <div className="site-container py-16 md:py-20">
-            <h2 className="text-3xl font-extrabold tracking-tight md:text-5xl">FAQ</h2>
-            <p className="mt-3 max-w-2xl text-black/60">Добавим вопросы/ответы. Косметику позже.</p>
-          </div>
-        </section>
-
+        {/* ========================= FORM (ULTRA) ========================= */}
         <div className="h-10 md:h-14" />
-
-        {/* Форма */}
         <section id="form" className="bg-white">
-          <div className="site-container py-16 md:py-20">
-            <div className="rounded-3xl border border-black/10 bg-white p-8 shadow-[0_18px_60px_rgba(0,0,0,0.06)] md:p-10">
-              <div className="grid gap-8 md:grid-cols-2 md:items-start">
+          <div className="site-container py-18 md:py-22">
+            <div className="relative overflow-hidden rounded-4xl border border-black/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.08)]">
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-24 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-[#ffc400]/14 blur-3xl" />
+                <div className="absolute -bottom-28 -left-24 h-80 w-80 rounded-full bg-black/5 blur-3xl" />
+              </div>
+
+              <div className="relative grid gap-10 p-8 md:grid-cols-[1.05fr_1fr] md:p-12">
+                {/* LEFT */}
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-extrabold text-white">
                     <span className="inline-block h-2 w-2 rounded-full bg-[#ffc400]" />
                     Заявка
                   </div>
 
-                  <h2 className="mt-4 text-3xl font-extrabold tracking-tight md:text-5xl">
+                  <h2 className="mt-5 text-3xl font-extrabold tracking-tight md:text-5xl">
                     Оставьте заявку — перезвоним и уточним детали
                   </h2>
 
-                  <p className="mt-3 max-w-xl text-black/60">
+                  <p className="mt-4 max-w-xl text-black/60">
                     Город, ЖК и удобное время — этого достаточно, чтобы договориться о выезде.
+                    <span className="ml-1 text-black/60">
+                      Можете выбрать город на карте — он подставится сам.
+                    </span>
                   </p>
 
-                  <div className="mt-6 space-y-2 text-sm text-black/70">
-                    <div>
-                      <span className="font-extrabold text-black">Телефон:</span>{" "}
-                      <a className="hover:underline" href={phoneLink}>
+                  <div className="mt-8 grid max-w-xl gap-3">
+                    <div className="rounded-2xl border border-black/10 bg-white/70 p-4">
+                      <div className="text-xs font-bold text-black/50">Телефон</div>
+                      <a href={phoneLink} className="mt-1 inline-flex text-base font-extrabold hover:underline">
                         {phoneDisplay}
                       </a>
                     </div>
-                    <div>
-                      <span className="font-extrabold text-black">Почта:</span>{" "}
-                      <a className="hover:underline" href={`mailto:${email}`}>
-                        {email}
-                      </a>
+
+                   <a
+  href={`mailto:${email}?subject=${encodeURIComponent("Заявка на приёмку квартиры")}`}
+  className="group block rounded-2xl border border-black/10 bg-black/[0.02] px-5 py-4 transition hover:bg-black/[0.035] focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40"
+  aria-label="Написать на почту"
+>
+  <div className="text-xs font-bold text-black/45">Почта</div>
+  <div className="mt-1 text-lg font-extrabold tracking-tight text-black underline-offset-4 group-hover:underline">
+    {email}
+  </div>
+</a>
+
+
+                    <div className="mt-2 text-sm text-black/50">
+                      Обычно отвечаем быстро. Без спама и “продаж по телефону”.
                     </div>
                   </div>
                 </div>
 
-                {/* по твоей просьбе: без реальной отправки */}
-                <form className="grid gap-3">
-                  <input className="input" placeholder="Ваше имя" />
-                  <input className="input" placeholder="Телефон" />
-                  <input className="input" placeholder="Город / ЖК" />
-                  <textarea className="input min-h-30 resize-none" placeholder="Комментарий (необязательно)" />
-                  <button type="button" className="btn-primary w-full">
-                    Отправить
-                  </button>
-                  <div className="text-xs text-black/50">
-                    Нажимая «Отправить», вы соглашаетесь на обработку персональных данных.
-                  </div>
-                </form>
+                {/* RIGHT */}
+                <div className="relative">
+                  {/* статус отправки (мягкий, “дорого”) */}
+                  {sentOk ? (
+                    <div
+                      className={[
+                        "mb-4 rounded-2xl border p-4 text-sm",
+                        sentOk === "ok"
+                          ? "border-black/10 bg-[#ffc400]/12 text-black"
+                          : "border-black/10 bg-black/5 text-black",
+                      ].join(" ")}
+                    >
+                      {sentOk === "ok" ? (
+                        <span>
+                          ✅ Заявка отправлена. Если нужно — уточним детали по телефону.
+                        </span>
+                      ) : (
+                        <span>
+                          ⚠️ Не получилось отправить. Попробуйте ещё раз или позвоните:{" "}
+                          <a className="font-bold hover:underline" href={phoneLink}>
+                            {phoneDisplay}
+                          </a>
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <form
+                    className="grid gap-4"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!sending) submit();
+                    }}
+                  >
+                    <label className="group/field relative">
+                      <span className="mb-2 block text-xs font-bold text-black/60">Ваше имя</span>
+                      <input
+                        value={form.name}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm((s) => ({ ...s, name: v }));
+                          if (touched.name) setErrors(validate({ ...form, name: v }));
+                        }}
+                        onBlur={() => {
+                          setTouched((t) => ({ ...t, name: true }));
+                          setErrors(validate(form));
+                        }}
+                        placeholder="Например, Анна"
+                        className={softFieldClass("name")}
+                      />
+                      {touched.name && errors.name ? (
+                        <div className="mt-2 text-xs text-black/50">{errors.name}</div>
+                      ) : (
+                        <div className="mt-2 text-xs text-black/30"> </div>
+                      )}
+                    </label>
+
+                    <label className="group/field relative">
+                      <span className="mb-2 block text-xs font-bold text-black/60">Телефон</span>
+                      <input
+                        inputMode="tel"
+                        value={form.phone}
+                        onChange={(e) => {
+                          const v = maskPhone(e.target.value);
+                          setForm((s) => ({ ...s, phone: v }));
+                          if (touched.phone) setErrors(validate({ ...form, phone: v }));
+                        }}
+                        onBlur={() => {
+                          setTouched((t) => ({ ...t, phone: true }));
+                          setErrors(validate(form));
+                        }}
+                        placeholder="+7 (___) ___-__-__"
+                        className={softFieldClass("phone")}
+                      />
+                      {touched.phone && errors.phone ? (
+                        <div className="mt-2 text-xs text-black/50">{errors.phone}</div>
+                      ) : (
+                        <div className="mt-2 text-xs text-black/30"> </div>
+                      )}
+                    </label>
+
+                    <label className="group/field relative">
+                      <span className="mb-2 block text-xs font-bold text-black/60">Город / ЖК</span>
+                      <input
+                        value={form.city}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm((s) => ({ ...s, city: v }));
+                          if (touched.city) setErrors(validate({ ...form, city: v }));
+                        }}
+                        onBlur={() => {
+                          setTouched((t) => ({ ...t, city: true }));
+                          setErrors(validate(form));
+                        }}
+                        placeholder="Севастополь, ЖК …"
+                        className={softFieldClass("city")}
+                      />
+                      {touched.city && errors.city ? (
+                        <div className="mt-2 text-xs text-black/50">{errors.city}</div>
+                      ) : (
+                        <div className="mt-2 text-xs text-black/30"> </div>
+                      )}
+                    </label>
+
+                    <label className="group/field relative">
+                      <span className="mb-2 block text-xs font-bold text-black/60">Комментарий (необязательно)</span>
+                      <textarea
+                        value={form.comment}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm((s) => ({ ...s, comment: v }));
+                        }}
+                        onBlur={() => setTouched((t) => ({ ...t, comment: true }))}
+                        placeholder="Площадь, отделка/без, когда планируете приёмку…"
+                        className={[
+                          softFieldClass("comment"),
+                          "min-h-28 resize-none",
+                        ].join(" ")}
+                      />
+                      <div className="mt-2 text-xs text-black/30"> </div>
+                    </label>
+
+                    <button
+                      type="submit"
+                      aria-describedby={formId}
+                      disabled={sending}
+                      className={[
+                        "relative mt-1 inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-4",
+                        "bg-[#ffc400] font-extrabold text-black",
+                        "transition duration-300",
+                        sending ? "opacity-80" : "hover:-translate-y-0.5 active:translate-y-0",
+                        "shadow-[0_18px_50px_rgba(255,196,0,0.25)] hover:shadow-[0_22px_70px_rgba(255,196,0,0.35)]",
+                        "ring-1 ring-black/10",
+                      ].join(" ")}
+                    >
+                      {sending ? "Отправляем…" : "Отправить"}
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-black/60" />
+                      <span className="text-sm font-bold text-black/70">1–2 минуты</span>
+
+                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+                        <span
+                          className={[
+                            "absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-white/35 blur-sm transition duration-500",
+                            sending ? "opacity-0" : "group-hover:translate-x-[220%]",
+                          ].join(" ")}
+                        />
+                      </span>
+                    </button>
+
+                    <div id={formId} className="text-center text-xs text-black/50">
+                      Нажимая «Отправить», вы соглашаетесь на обработку персональных данных.
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         <div className="h-10 md:h-14" />
+        <Footer />
       </main>
     </div>
   );

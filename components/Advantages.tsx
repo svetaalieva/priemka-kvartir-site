@@ -1,74 +1,69 @@
 "use client";
 
 const items = [
-  { title: "50+ параметров проверки", text: "Проверяем отделку, инженерные системы и скрытые дефекты." },
-  { title: "Проверка площади", text: "Сверяем фактическую площадь с проектной документацией." },
-  { title: "Фото и видеофиксация", text: "Каждый дефект фиксируется и передаётся вам в отчёте." },
-  { title: "Акт замечаний", text: "Подготавливаем официальный документ для застройщика." },
+  {
+    title: "Документы и квалификация",
+    desc: "Покажем подтверждения и допуски. Всё прозрачно — до выезда.",
+  },
+  {
+    title: "Акт замечаний",
+    desc: "Пишем по нормам и фактам. Чтобы застройщик устранял дефекты, а не спорил.",
+  },
+  {
+    title: "Фото и видео фиксация",
+    desc: "Фиксируем всё на месте, чтобы у вас были доказательства и спокойствие.",
+  },
+  {
+    title: "Опыт по новостройкам",
+    desc: "Знаем типовые проблемы ЖК. Проверяем быстро и внимательно.",
+  },
 ];
 
 export default function Advantages() {
   return (
-    <section
-  id="advantages"
-  className="section-dark pt-10 pb-10 md:pt-14 md:pb-14"
->
-  <div className="site-container py-16 md:py-20">
-
-        {/* Верх */}
-        <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-extrabold text-white ring-1 ring-white/10">
-              <span className="h-2 w-2 rounded-full bg-(--brand-yellow)" />
-              Почему нам доверяют
-            </div>
-
-            <h2 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
-              Аргументы и документ, <span className="text-(--brand-yellow)">которые работают</span>
-            </h2>
-
-            <p className="mt-4 max-w-2xl text-base text-white/70">
-              Выявляем дефекты до подписания акта приёма-передачи. Защищаем ваши интересы перед застройщиком.
-            </p>
+    <section className="section-light">
+      <div className="site-container py-12 md:py-16">
+        {/* Заголовок секции */}
+        <div className="max-w-2xl">
+          <div className="text-sm font-semibold tracking-wide text-black/60">
+            Почему нам доверяют
           </div>
-
-          {/* Пилюли (не режутся) */}
-          <div className="flex flex-wrap gap-2 md:justify-end">
-            <span className="inline-flex rounded-full bg-white px-4 py-2 text-xs font-extrabold text-black">
-              Фото/видео
-            </span>
-            <span className="inline-flex rounded-full bg-(--brand-yellow) px-4 py-2 text-xs font-extrabold text-black">
-              Акт замечаний
-            </span>
-          </div>
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
+            Приёмка без лишних слов — только факты
+          </h2>
+          <p className="mt-3 text-black/70 md:text-lg">
+            Мы на вашей стороне: проверяем, фиксируем, оформляем так, чтобы было проще добиться
+            устранения недостатков.
+          </p>
         </div>
 
         {/* Карточки */}
-        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {items.map((it) => (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((x) => (
             <div
-              key={it.title}
-              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-7 shadow-[0_18px_60px_rgba(0,0,0,0.35)] transition-transform duration-200 hover:-translate-y-1"
+              key={x.title}
+              className="rounded-3xl border border-black/10 bg-white p-5 shadow-[0_14px_45px_rgba(0,0,0,0.06)]"
             >
-              {/* Свечение на ховер */}
-              <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-(--brand-yellow)/20 blur-3xl opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-
-              <div className="flex items-start justify-between gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-(--brand-yellow)" />
-                <div className="text-xs font-extrabold text-white/40">Контроль качества</div>
+              {/* “иконка” без библиотек */}
+              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-black/5 border border-black/10">
+                <span className="text-sm font-black text-black/70">✓</span>
               </div>
 
-              <div className="mt-7 text-xl font-extrabold tracking-tight">{it.title}</div>
-              <div className="mt-3 text-sm leading-relaxed text-white/70">{it.text}</div>
-
-              <div className="mt-8 h-px w-full bg-white/10" />
-
-              <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-white/75">
-                <span className="h-2 w-2 rounded-full bg-(--brand-yellow)" />
-                Без «воды», только по делу
-              </div>
+              <div className="text-base font-extrabold">{x.title}</div>
+              <div className="mt-2 text-sm text-black/70">{x.desc}</div>
             </div>
           ))}
+        </div>
+
+        {/* Мини CTA */}
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <a href="#lead" className="btn-primary">
+            Оставить заявку
+          </a>
+          <a href="#docs" className="btn-outline">
+            Посмотреть документы
+          </a>
+          <div className="text-xs text-black/50">Севастополь • Симферополь • Ялта и др.</div>
         </div>
       </div>
     </section>
