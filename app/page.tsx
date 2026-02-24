@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState, useId } from "react";
 
 import Advantages from "@/components/Advantages";
@@ -10,6 +11,7 @@ import Docs from "@/components/Docs";
 import Geo from "@/components/Geo";
 import FAQ from "@/components/FAQ";
 import Footer from "@/components/Footer";
+import CookieBanner from "@/components/CookieBanner";
 
 type Social = {
   name: string;
@@ -652,8 +654,16 @@ export default function Home() {
                     </button>
 
                     <div id={formId} className="text-center text-xs text-black/50">
-                      Нажимая «Отправить», вы соглашаетесь на обработку персональных данных.
-                    </div>
+  Нажимая «Отправить», вы соглашаетесь на{" "}
+  <Link className="underline underline-offset-2 hover:text-black" href="/consent">
+    обработку персональных данных
+  </Link>{" "}
+  и принимаете{" "}
+  <Link className="underline underline-offset-2 hover:text-black" href="/privacy">
+    политику конфиденциальности
+  </Link>
+  .
+</div>
                   </form>
                 </div>
               </div>
@@ -663,6 +673,7 @@ export default function Home() {
 
         <div className="h-10 md:h-14" />
         <Footer />
+        <CookieBanner />
       </main>
     </div>
   );
