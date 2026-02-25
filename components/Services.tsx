@@ -1,161 +1,134 @@
 "use client";
 
-/**
- * Услуги — премиальные карточки
- * - без картинок из public (чтобы ничего не ломалось)
- * - цена не переносится
- * - аккуратные иконки через CSS
- */
+import type { ComponentType } from "react";
 
-type ServiceItem = {
+import {
+  IconNewBuildCheck,
+  IconThermal,
+  IconEMI,
+  IconRadiation,
+  IconConclusion,
+  IconPlan,
+} from "./service-icons";
+
+type IconComp = ComponentType<{ className?: string }>;
+
+type Svc = {
   title: string;
-  price: string;
-  note: string;
-  bullets: string[];
-  badge?: string;
-  icon: string;
+  desc: string;
+  icon: IconComp;
+  hit?: boolean;
 };
 
-const services: ServiceItem[] = [
-  {
-    title: "Приёмка квартиры с отделкой",
-    price: "от 5 000 ₽",
-    note: "Оптимально для большинства новостроек",
-    badge: "ХИТ",
-    icon: "🏠",
-    bullets: [
-      "Отделка: стены, пол, потолок",
-      "Окна/двери, откосы, подоконники",
-      "Сантехника и электрика",
-      "Фото/видео фиксация",
-      "Акт замечаний",
-    ],
-  },
-  {
-    title: "Приёмка без отделки",
-    price: "от 4 000 ₽",
-    note: "Когда важно проверить основание и инженерию",
-    icon: "📐",
-    bullets: [
-      "Геометрия, уровни, плоскости",
-      "Стяжка/штукатурка",
-      "Инженерные выводы",
-      "Фото/видео фиксация",
-      "Акт замечаний",
-    ],
-  },
-  {
-    title: "Повторная приёмка",
-    price: "от 3 000 ₽",
-    note: "Контроль устранения замечаний",
-    icon: "🔁",
-    bullets: [
-      "Проверка устранения дефектов",
-      "Сравнение «до/после»",
-      "Дополнение акта",
-      "Фото/видео фиксация",
-    ],
-  },
-];
-
 export default function Services() {
+  const services: Svc[] = [
+    {
+      title: "Приёмка квартиры в новостройке",
+      desc: "Проверка качества отделки, инженерии и площади. Фото/видео фиксация и акт замечаний.",
+      icon: IconNewBuildCheck,
+      hit: true,
+    },
+    {
+      title: "Тепловизионный осмотр",
+      desc: "Проверяем теплопотери, продувания, мостики холода и скрытые дефекты.",
+      icon: IconThermal,
+    },
+    {
+      title: "Замер квартиры на ЭМИ",
+      desc: "Контроль электромагнитного фона (по запросу) и рекомендации по снижению рисков.",
+      icon: IconEMI,
+    },
+    {
+      title: "Замер квартиры на радиацию",
+      desc: "Проверка радиационного фона (по запросу) с фиксацией результатов.",
+      icon: IconRadiation,
+    },
+    {
+      title: "Заключение специалиста",
+      desc: "Письменное заключение по выявленным дефектам и рекомендации по устранению.",
+      icon: IconConclusion,
+    },
+    {
+      title: "Подробный план квартиры",
+      desc: "Детальный обмер и планировка: удобно для ремонта, мебели и понимания реальной площади.",
+      icon: IconPlan,
+    },
+  ];
+
   return (
-    <section className="section-light" id="services">
-      <div className="site-container py-12 md:py-16">
+    <section id="services" className="relative bg-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -right-40 top-10 h-140 w-140 rounded-full bg-[#ffc400]/10 blur-3xl" />
+        <div className="absolute -left-40 bottom-0 h-140 w-140 rounded-full bg-black/5 blur-3xl" />
+      </div>
 
-        {/* Заголовок */}
-        <div className="max-w-2xl">
-          <div className="text-sm font-semibold tracking-wide text-black/60">
-            Услуги
-          </div>
-
-          <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
-            Выберите формат приёмки
+      <div className="site-container relative py-16 md:py-20">
+        <div className="mb-10 md:mb-12">
+          <div className="text-sm font-semibold text-black/50">Услуги</div>
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-5xl">
+            Что мы <span className="text-[#ffc400]">проверяем</span> и делаем
           </h2>
-
-          <p className="mt-3 text-black/70 md:text-lg">
-            Проверка → фиксация → акт замечаний для застройщика.
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-black/60">
+            Формат подбираем под задачу: от приёмки в новостройке до точечных инструментальных проверок.
           </p>
         </div>
 
-        {/* Карточки */}
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          {services.map((s) => (
-            <div
-              key={s.title}
-              className="group relative overflow-hidden rounded-3xl border border-black/10 bg-white p-6 shadow-[0_14px_45px_rgba(0,0,0,0.06)] transition hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(0,0,0,0.10)]"
-            >
-             
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {services.map((s) => {
+            const Icon = s.icon;
 
-              {/* Верхняя часть */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  {/* Иконка */}
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/10 bg-black/5 text-lg">
-                    {s.icon}
+            return (
+              <div
+                key={s.title}
+                className={[
+                  "group relative overflow-hidden rounded-3xl border border-black/10 bg-white p-6",
+                  "shadow-[0_22px_70px_rgba(0,0,0,0.08)]",
+                  "transition duration-300 hover:-translate-y-1 hover:shadow-[0_30px_95px_rgba(0,0,0,0.12)]",
+                ].join(" ")}
+              >
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100">
+                  <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffc400]/14 blur-3xl" />
+                  <div className="absolute -left-24 -bottom-24 h-72 w-72 rounded-full bg-black/5 blur-3xl" />
+                </div>
+
+                {s.hit ? (
+                  <div className="absolute right-5 top-5 inline-flex items-center gap-2 rounded-full bg-[#ffc400] px-3 py-1 text-xs font-extrabold text-black shadow-[0_16px_40px_rgba(255,196,0,0.25)]">
+                    ХИТ
                   </div>
+                ) : null}
 
-                  <div>
-                   <div className="flex flex-wrap items-center gap-2">
-  <div className="text-lg font-extrabold">{s.title}</div>
-
-  {s.badge && (
-    <span className="rounded-full bg-[var(--brand-yellow)] px-2.5 py-1 text-[11px] font-extrabold text-black shadow-[0_10px_24px_rgba(255,196,0,0.25)]">
-      {s.badge}
-    </span>
-  )}
-</div>
-
-                    <div className="mt-1 text-sm text-black/60">
-                      {s.note}
+                <div className="relative flex items-start gap-4">
+                  <div className="relative shrink-0">
+                    <div className="absolute inset-0 rounded-2xl bg-[#ffc400]/18 blur-xl opacity-0 transition duration-300 group-hover:opacity-100" />
+                    <div className="relative grid h-12 w-12 place-items-center rounded-2xl border border-black/10 bg-white shadow-[0_12px_30px_rgba(0,0,0,0.06)]">
+                      <Icon className="h-7 w-7" />
                     </div>
                   </div>
-                </div>
 
-                {/* Цена — НЕ переносится */}
-                <div className="text-right whitespace-nowrap">
-                  <div className="text-lg font-extrabold">
-                    {s.price}
-                  </div>
-                  <div className="mt-1 text-xs text-black/50">
-                    выезд по Крыму
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-extrabold tracking-tight text-black">{s.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-black/60">{s.desc}</p>
                   </div>
                 </div>
+
+                <div className="relative mt-6 flex items-center gap-3">
+                  <a href="#form" className="btn-primary">
+                    Записаться
+                  </a>
+                  <a href="#process" className="btn-outline">
+                    Как работаем
+                  </a>
+                </div>
+
+                {s.hit ? <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-[#ffc400]/35" /> : null}
               </div>
-
-              {/* Список */}
-              <ul className="mt-5 space-y-2 text-sm text-black/75">
-                {s.bullets.map((b) => (
-                  <li key={b} className="flex gap-2">
-                    <span className="mt-[2px] inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/5 border border-black/10 text-xs font-black">
-                      ✓
-                    </span>
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* Кнопки */}
-              <div className="mt-6 flex flex-wrap gap-3">
-                <a href="#lead" className="btn-primary">
-                  Записаться
-                </a>
-                <a href="#process" className="btn-outline">
-                  Как работаем
-                </a>
-              </div>
-
-              {/* Мягкий световой акцент */}
-              <div className="pointer-events-none absolute -bottom-24 -right-24 h-[260px] w-[260px] rounded-full bg-[var(--brand-yellow)]/20 blur-3xl opacity-0 transition group-hover:opacity-100" />
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Подпись */}
-        <div className="mt-6 text-xs text-black/50">
-          * Цена зависит от площади и формата отделки. Точную стоимость подтверждаем по телефону.
+        <div className="mt-6 text-xs font-semibold text-black/40">
+          * Формат и стоимость уточняем по телефону — зависит от площади и типа отделки.
         </div>
-
       </div>
     </section>
   );

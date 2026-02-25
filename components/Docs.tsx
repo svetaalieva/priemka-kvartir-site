@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type DocItem = {
   src: string;
@@ -23,182 +23,180 @@ export default function Docs() {
   const [open, setOpen] = useState(false);
   const [idx, setIdx] = useState(0);
 
-  const current = docs[idx];
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const close = () => setOpen(false);
-
-  const go = (next: number) => {
-    const n = (next + docs.length) % docs.length;
-    setIdx(n);
+  const openAt = (i: number) => {
+    setIdx(i);
+    setOpen(true);
   };
 
-  const next = () => go(idx + 1);
-  const prev = () => go(idx - 1);
+  const close = () => setOpen(false);
+  const prev = () => setIdx((s) => (s - 1 + docs.length) % docs.length);
+  const next = () => setIdx((s) => (s + 1) % docs.length);
 
+  // блокируем скролл страницы
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  // esc + стрелки
   useEffect(() => {
     if (!open) return;
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
-      if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") next();
     };
 
-    document.addEventListener("keydown", onKey);
-
-    // блокируем скролл страницы под модалкой
-    const prevOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = prevOverflow;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, idx]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <section id="docs" className="bg-white">
       <div className="site-container py-16 md:py-20">
-        <div className="text-sm font-semibold text-black/50">Документы</div>
-        <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-5xl">Подтверждения квалификации</h2>
-        <p className="mt-4 max-w-2xl text-base leading-relaxed text-black/60">
-          Сертификаты, допуски и документы — чтобы доверие было ещё до выезда.
-        </p>
+        <div className="mb-8">
+          <div className="text-sm font-semibold text-black/50">Документы</div>
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-5xl">
+            Подтверждение квалификации
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-black/60">
+            Нажмите на документ — откроется просмотр.
+          </p>
+        </div>
 
-        <div className="mt-10 grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {docs.map((d, i) => (
             <button
               key={d.src}
               type="button"
-              onClick={() => {
-                setIdx(i);
-                setOpen(true);
-              }}
+              onClick={() => openAt(i)}
               className={[
                 "group relative overflow-hidden rounded-3xl border border-black/10 bg-white text-left",
-                "shadow-[0_16px_60px_rgba(0,0,0,0.06)] transition",
-                "hover:-translate-y-[2px] hover:shadow-[0_24px_90px_rgba(0,0,0,0.10)]",
+                "shadow-[0_22px_70px_rgba(0,0,0,0.08)] transition",
+                "hover:-translate-y-0.5 hover:shadow-[0_28px_90px_rgba(0,0,0,0.12)]",
+                "focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40",
               ].join(" ")}
               style={{ cursor: "pointer" }}
-              aria-label={`Открыть документ: ${d.title}`}
             >
-              <div className="relative aspect-[4/5] w-full bg-black/[0.02]">
+              <div className="relative aspect-[3/4] w-full bg-black/[0.02]">
                 <Image
                   src={d.src}
                   alt={d.title}
                   fill
-                  sizes="(max-width: 768px) 90vw, 25vw"
+                  sizes="(max-width: 768px) 100vw, 25vw"
                   className="object-cover transition duration-500 group-hover:scale-[1.03]"
                 />
-                <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/15 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-                <div className="pointer-events-none absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-extrabold text-black ring-1 ring-black/10 backdrop-blur">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[#ffc400]" />
-                  Открыть
-                </div>
               </div>
 
               <div className="p-4">
-                <div className="text-sm font-extrabold">{d.title}</div>
-                {d.subtitle ? <div className="mt-1 text-xs text-black/55">{d.subtitle}</div> : null}
+                <div className="text-sm font-extrabold tracking-tight">{d.title}</div>
+                {d.subtitle && (
+                  <div className="mt-1 text-xs font-semibold text-black/55">{d.subtitle}</div>
+                )}
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* ================= MODAL (без зума) ================= */}
-      {open ? (
-        <div className="fixed inset-0 z-[100]">
-          {/* фон */}
+      {/* MODAL */}
+      {open && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center">
+          {/* backdrop */}
           <button
             type="button"
-            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-black/60 backdrop-blur-[6px]"
             onClick={close}
             aria-label="Закрыть"
           />
 
           {/* окно */}
-          <div className="absolute inset-0 flex items-center justify-center p-3 md:p-8">
-            <div
-              className={[
-                "relative w-full max-w-6xl overflow-hidden rounded-3xl border border-white/10 bg-white",
-                "shadow-[0_30px_120px_rgba(0,0,0,0.35)]",
-                "animate-[docsIn_220ms_ease-out]",
-              ].join(" ")}
-              role="dialog"
-              aria-modal="true"
-            >
-              {/* шапка */}
-              <div className="flex items-center justify-between gap-3 border-b border-black/10 px-4 py-3 md:px-6">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-extrabold">{current.title}</div>
-                  <div className="truncate text-xs text-black/55">
-                    {current.subtitle ? current.subtitle : "Документ"}
-                    <span className="mx-2">•</span>
-                    <span className="font-semibold">{idx + 1}</span> / {docs.length}
-                    <span className="mx-2">•</span>
-                    <span className="text-black/45">Листай ← → • Esc — закрыть • Скролл внутри окна</span>
+          <div className="relative z-[91] mx-auto w-[94vw] max-w-4xl">
+            <div className="overflow-hidden rounded-4xl border border-white/10 bg-white shadow-[0_30px_120px_rgba(0,0,0,0.35)] animate-[fadeIn_.3s_ease]">
+              
+              {/* topbar */}
+              <div className="flex items-center justify-between gap-3 border-b border-black/10 px-5 py-3">
+                <div>
+                  <div className="text-sm font-extrabold text-black">{docs[idx].title}</div>
+                  <div className="text-xs font-semibold text-black/50">
+                    {docs[idx].subtitle ?? "Документ"}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button type="button" className="btn-outline px-3 py-2 text-sm" onClick={prev} aria-label="Предыдущий">
+                  <button className="btn-outline px-3 py-2" onClick={prev}>
                     ←
                   </button>
-                  <button type="button" className="btn-outline px-3 py-2 text-sm" onClick={next} aria-label="Следующий">
+                  <button className="btn-outline px-3 py-2" onClick={next}>
                     →
                   </button>
-                  <button type="button" className="btn-outline px-3 py-2 text-sm" onClick={close} aria-label="Закрыть">
+                  <button
+                    ref={closeBtnRef}
+                    className="btn-outline px-3 py-2"
+                    onClick={close}
+                  >
                     ✕
                   </button>
                 </div>
               </div>
 
-              {/* тело: внутри есть скролл */}
-              <div className="max-h-[78vh] overflow-auto bg-black/[0.02] p-3 md:p-6">
-                <div className="mx-auto max-w-4xl">
-                  <div className="relative overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_70px_rgba(0,0,0,0.12)]">
-                    {/* просто картинка — без трансформаций */}
-                    <Image
-                      src={current.src}
-                      alt={current.title}
-                      width={1400}
-                      height={1800}
-                      className="h-auto w-full"
-                      priority
-                    />
-
-                    {/* мягкий премиум-свет */}
-                    <div className="pointer-events-none absolute inset-0">
-                      <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#ffc400]/12 blur-3xl" />
-                      <div className="absolute -left-24 bottom-0 h-80 w-80 rounded-full bg-black/5 blur-3xl" />
-                    </div>
-                  </div>
-
-                  <div className="mt-3 text-xs text-black/45">
-                    Если документ длинный — просто скролль вниз внутри окна.
-                  </div>
+              {/* красивый скролл */}
+              <div className="max-h-[78vh] overflow-y-auto docs-scroll bg-black/[0.02] p-6">
+                <div className="relative mx-auto w-full max-w-[900px] overflow-hidden rounded-3xl bg-white shadow-[0_24px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/10">
+                  <Image
+                    src={docs[idx].src}
+                    alt={docs[idx].title}
+                    width={1200}
+                    height={1600}
+                    className="h-auto w-full"
+                    priority
+                  />
                 </div>
               </div>
 
-              {/* анимация */}
-              <style jsx>{`
-                @keyframes docsIn {
-                  from {
-                    transform: translateY(10px) scale(0.985);
-                    opacity: 0;
-                  }
-                  to {
-                    transform: translateY(0) scale(1);
-                    opacity: 1;
-                  }
-                }
-              `}</style>
+              <div className="border-t border-black/10 px-5 py-3 text-xs font-semibold text-black/50">
+                {idx + 1} / {docs.length}
+              </div>
             </div>
           </div>
+
+          {/* стили скролла */}
+          <style jsx>{`
+            .docs-scroll::-webkit-scrollbar {
+              width: 8px;
+            }
+            .docs-scroll::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .docs-scroll::-webkit-scrollbar-thumb {
+              background: rgba(255, 196, 0, 0.7);
+              border-radius: 20px;
+              transition: background 0.3s ease;
+            }
+            .docs-scroll::-webkit-scrollbar-thumb:hover {
+              background: rgba(255, 196, 0, 1);
+            }
+
+            /* Firefox */
+            .docs-scroll {
+              scrollbar-width: thin;
+              scrollbar-color: rgba(255,196,0,0.7) transparent;
+            }
+
+            @keyframes fadeIn {
+              from { opacity: 0; transform: translateY(10px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }

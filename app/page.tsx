@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useId } from "react";
+import { useEffect, useMemo, useState, useId, useRef } from "react";
 
 import Advantages from "@/components/Advantages";
 import Services from "@/components/Services";
@@ -86,6 +86,7 @@ export default function Home() {
   const [sentOk, setSentOk] = useState<null | "ok" | "err">(null);
 
   const formId = useId();
+  const cityInputRef = useRef<HTMLInputElement | null>(null);
 
   const validate = (s: FormState): FormErrors => {
     const e: FormErrors = {};
@@ -170,6 +171,12 @@ export default function Home() {
       // мягкий скролл к форме — “вау”-эффект
       const el = document.getElementById("form");
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      // ✅ фокус в поле “Город / ЖК”
+      window.setTimeout(() => {
+        cityInputRef.current?.focus();
+        cityInputRef.current?.select();
+      }, 450);
     };
 
     window.addEventListener("geo:city", handler as EventListener);
@@ -184,8 +191,12 @@ export default function Home() {
         <div className="border-b border-black/10 bg-white">
           <div className="site-container">
             <div className="flex items-center justify-between gap-4 py-3 md:py-4">
-              {/* Логотип */}
-              <a href="#" className="flex items-center">
+              {/* Логотип (кликабельный на главную) */}
+              <Link
+                href="/"
+                aria-label="На главную"
+                className="inline-flex items-center rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc400]/60"
+              >
                 <Image
                   src="/brand/logo-horizontal.png"
                   alt="Контроль качества"
@@ -194,7 +205,7 @@ export default function Home() {
                   priority
                   className="h-12 w-auto md:h-16"
                 />
-              </a>
+              </Link>
 
               {/* Телефон + соцсети (десктоп) */}
               <div className="hidden items-center justify-end gap-5 md:flex">
@@ -210,27 +221,42 @@ export default function Home() {
                     <a
                       key={s.name}
                       href={s.href}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black text-white transition hover:opacity-90"
-                      aria-label={s.name}
-                      title={s.name}
+                      onClick={(e) => {
+                        if (s.href === "#") e.preventDefault();
+                      }}
+                      className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition hover:opacity-90"
+                      aria-label={`${s.name} (скоро)`}
+                      title={`${s.name} — скоро`}
                     >
                       {s.icon === "tg" && (
-                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="block h-5 w-5 origin-center transform-gpu scale-[0.90] -translate-x-[2px] translate-y-[1px]"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
                           <path d="M9.9 16.6l-.4 4.2c.6 0 .9-.3 1.2-.6l2.8-2.6 5.8 4.2c1.1.6 1.8.3 2.1-1l3.8-17.8c.4-1.6-.6-2.2-1.6-1.8L1.6 9.3c-1.5.6-1.5 1.5-.3 1.9l5.6 1.8 13-8.2c.6-.4 1.2-.2.8.2L9.9 16.6z" />
                         </svg>
                       )}
+
                       {s.icon === "vk" && (
-                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
                           <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
                         </svg>
                       )}
+
                       {s.icon === "ig" && (
-                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
                           <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm10 2H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm-5 4.2A3.8 3.8 0 1 1 8.2 12 3.8 3.8 0 0 1 12 8.2zm0 2A1.8 1.8 0 1 0 13.8 12 1.8 1.8 0 0 0 12 10.2zM17.7 6.1a1 1 0 1 1-1 1 1 1 0 0 1 1-1z" />
                         </svg>
                       )}
+
+                      <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black px-3 py-1 text-[11px] font-extrabold text-white opacity-0 shadow-lg transition group-hover:opacity-100">
+                        Скоро
+                      </span>
                     </a>
                   ))}
+
                   <span className="text-lg font-black text-black">*</span>
                 </div>
               </div>
@@ -345,8 +371,8 @@ export default function Home() {
 
       {/* ========================= CONTENT ========================= */}
       <main>
-        {/* HERO */}
-        <section className="relative bg-white pt-6 md:pt-8">
+        {/* HERO (уплотнён) */}
+        <section className="relative bg-white pt-4 md:pt-6">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute -top-28 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-[#ffc400]/16 blur-3xl" />
             <div className="absolute -top-32 -left-24 h-105 w-105 rounded-full bg-black/5 blur-3xl" />
@@ -354,8 +380,8 @@ export default function Home() {
             <div className="absolute inset-x-0 top-0 h-20 bg-linear-to-b from-white via-white to-transparent" />
           </div>
 
-          <div className="site-container relative pb-16 md:pb-24">
-            <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_380px] md:items-start">
+          <div className="site-container relative pb-12 md:pb-16">
+            <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_380px] md:items-start">
               <div>
                 <div className="flex flex-wrap gap-3">
                   <span className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
@@ -370,12 +396,12 @@ export default function Home() {
                   Профессиональная <span className="text-[#ffc400]">приёмка</span> квартир в новостройках
                 </h1>
 
-                <p className="mt-5 max-w-xl text-base leading-relaxed text-black/70">
+                <p className="mt-4 max-w-xl text-base leading-relaxed text-black/70">
                   Проверим качество отделки, инженерные системы и площадь. Составим акт замечаний для застройщика и
                   подскажем, как добиться устранения дефектов.
                 </p>
 
-                <div className="mt-8 flex flex-wrap gap-4">
+                <div className="mt-7 flex flex-wrap gap-4">
                   <a href="#form" className="btn-primary">
                     Записаться
                   </a>
@@ -384,7 +410,7 @@ export default function Home() {
                   </a>
                 </div>
 
-                <div className="mt-8 flex flex-wrap gap-x-10 gap-y-3 text-sm text-black/60">
+                <div className="mt-7 flex flex-wrap gap-x-10 gap-y-3 text-sm text-black/60">
                   <div>
                     <span className="font-extrabold text-black">2–3 часа</span> осмотр
                   </div>
@@ -397,7 +423,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="relative mx-auto w-full max-w-95">
+              <div className="relative mx-auto w-full max-w-95 md:mt-1">
                 <div className="absolute -left-3 top-3 h-[calc(100%-12px)] w-[calc(100%+12px)] rounded-3xl bg-[#ffc400]" />
 
                 <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_22px_70px_rgba(0,0,0,0.14)] ring-1 ring-black/10">
@@ -416,7 +442,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 px-5 pb-5">
+                  <div className="flex items-center justify-between gap-3 px-5 pb-4">
                     <div className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
                       Выезд в день обращения • Крым
                     </div>
@@ -430,27 +456,26 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <Advantages />
 
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <Services />
 
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <Process />
 
-        {/* порядок */}
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <Geo />
 
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <Docs />
 
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <FAQ />
 
         {/* ========================= FORM (ULTRA) ========================= */}
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <section id="form" className="bg-white">
           <div className="site-container py-18 md:py-22">
             <div className="relative overflow-hidden rounded-4xl border border-black/10 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.08)]">
@@ -473,9 +498,7 @@ export default function Home() {
 
                   <p className="mt-4 max-w-xl text-black/60">
                     Город, ЖК и удобное время — этого достаточно, чтобы договориться о выезде.
-                    <span className="ml-1 text-black/60">
-                      Можете выбрать город на карте — он подставится сам.
-                    </span>
+                    <span className="ml-1 text-black/60">Можете выбрать город на карте — он подставится сам.</span>
                   </p>
 
                   <div className="mt-8 grid max-w-xl gap-3">
@@ -486,17 +509,16 @@ export default function Home() {
                       </a>
                     </div>
 
-                   <a
-  href={`mailto:${email}?subject=${encodeURIComponent("Заявка на приёмку квартиры")}`}
-  className="group block rounded-2xl border border-black/10 bg-black/[0.02] px-5 py-4 transition hover:bg-black/[0.035] focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40"
-  aria-label="Написать на почту"
->
-  <div className="text-xs font-bold text-black/45">Почта</div>
-  <div className="mt-1 text-lg font-extrabold tracking-tight text-black underline-offset-4 group-hover:underline">
-    {email}
-  </div>
-</a>
-
+                    <a
+                      href={`mailto:${email}?subject=${encodeURIComponent("Заявка на приёмку квартиры")}`}
+                      className="group block rounded-2xl border border-black/10 bg-black/[0.02] px-5 py-4 transition hover:bg-black/[0.035] focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40"
+                      aria-label="Написать на почту"
+                    >
+                      <div className="text-xs font-bold text-black/45">Почта</div>
+                      <div className="mt-1 text-lg font-extrabold tracking-tight text-black underline-offset-4 group-hover:underline">
+                        {email}
+                      </div>
+                    </a>
 
                     <div className="mt-2 text-sm text-black/50">
                       Обычно отвечаем быстро. Без спама и “продаж по телефону”.
@@ -506,7 +528,7 @@ export default function Home() {
 
                 {/* RIGHT */}
                 <div className="relative">
-                  {/* статус отправки (мягкий, “дорого”) */}
+                  {/* статус отправки */}
                   {sentOk ? (
                     <div
                       className={[
@@ -517,9 +539,7 @@ export default function Home() {
                       ].join(" ")}
                     >
                       {sentOk === "ok" ? (
-                        <span>
-                          ✅ Заявка отправлена. Если нужно — уточним детали по телефону.
-                        </span>
+                        <span>✅ Заявка отправлена. Если нужно — уточним детали по телефону.</span>
                       ) : (
                         <span>
                           ⚠️ Не получилось отправить. Попробуйте ещё раз или позвоните:{" "}
@@ -588,6 +608,7 @@ export default function Home() {
                     <label className="group/field relative">
                       <span className="mb-2 block text-xs font-bold text-black/60">Город / ЖК</span>
                       <input
+                        ref={cityInputRef}
                         value={form.city}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -618,10 +639,7 @@ export default function Home() {
                         }}
                         onBlur={() => setTouched((t) => ({ ...t, comment: true }))}
                         placeholder="Площадь, отделка/без, когда планируете приёмку…"
-                        className={[
-                          softFieldClass("comment"),
-                          "min-h-28 resize-none",
-                        ].join(" ")}
+                        className={[softFieldClass("comment"), "min-h-28 resize-none"].join(" ")}
                       />
                       <div className="mt-2 text-xs text-black/30"> </div>
                     </label>
@@ -642,28 +660,19 @@ export default function Home() {
                       {sending ? "Отправляем…" : "Отправить"}
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-black/60" />
                       <span className="text-sm font-bold text-black/70">1–2 минуты</span>
-
-                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
-                        <span
-                          className={[
-                            "absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-white/35 blur-sm transition duration-500",
-                            sending ? "opacity-0" : "group-hover:translate-x-[220%]",
-                          ].join(" ")}
-                        />
-                      </span>
                     </button>
 
                     <div id={formId} className="text-center text-xs text-black/50">
-  Нажимая «Отправить», вы соглашаетесь на{" "}
-  <Link className="underline underline-offset-2 hover:text-black" href="/consent">
-    обработку персональных данных
-  </Link>{" "}
-  и принимаете{" "}
-  <Link className="underline underline-offset-2 hover:text-black" href="/privacy">
-    политику конфиденциальности
-  </Link>
-  .
-</div>
+                      Нажимая «Отправить», вы соглашаетесь на{" "}
+                      <Link className="underline underline-offset-2 hover:text-black" href="/consent">
+                        обработку персональных данных
+                      </Link>{" "}
+                      и принимаете{" "}
+                      <Link className="underline underline-offset-2 hover:text-black" href="/privacy">
+                        политику конфиденциальности
+                      </Link>
+                      .
+                    </div>
                   </form>
                 </div>
               </div>
@@ -671,7 +680,7 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="h-10 md:h-14" />
+        <div className="h-8 md:h-12" />
         <Footer />
         <CookieBanner />
       </main>
