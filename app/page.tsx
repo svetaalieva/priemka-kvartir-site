@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useId, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, useId } from "react";
 
 import Advantages from "@/components/Advantages";
 import Services from "@/components/Services";
@@ -19,26 +19,27 @@ type Social = {
   icon: "tg" | "vk" | "ig";
 };
 
+// ===== FORM (CLIENT REQUEST) =====
 type FormState = {
-  name: string;
+  fio: string; // 1) Полное ФИО дольщика
   phone: string;
-  city: string;
-  comment: string;
+  address: string; // 2) Город и полный адрес ЖК
+  area: string; // 3) Общая площадь
+  datetime: string; // 4) Дата и время осмотра
+  comment: string; // необязательно
 };
 
 type FormErrors = Partial<Record<keyof FormState, string>>;
 
 const maskPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
-
   let d = digits;
   if (d.startsWith("8")) d = "7" + d.slice(1);
   if (d.startsWith("9")) d = "7" + d;
 
-  // если вообще ничего — разрешаем пустое
   if (!d.length) return "";
 
-  const p = d.startsWith("7") ? d.slice(1) : d; // всё кроме ведущей 7
+  const p = d.startsWith("7") ? d.slice(1) : d;
   const a = p.slice(0, 3);
   const b = p.slice(3, 6);
   const c = p.slice(6, 8);
@@ -50,11 +51,17 @@ const maskPhone = (value: string) => {
   if (b.length) out += ` ${b}`;
   if (c.length) out += `-${c}`;
   if (e.length) out += `-${e}`;
-
   return out;
 };
 
 const phoneDigitsCount = (masked: string) => masked.replace(/\D/g, "").length;
+
+const normalizeArea = (v: string) => {
+  const cleaned = v.replace(/[^\d.,]/g, "").replace(",", ".");
+  const parts = cleaned.split(".");
+  if (parts.length > 2) return parts[0] + "." + parts.slice(1).join("");
+  return cleaned;
+};
 
 export default function Home() {
   const phoneDisplay = "+7 (978) 704-33-16";
@@ -72,11 +79,13 @@ export default function Home() {
 
   const [mobileMenu, setMobileMenu] = useState(false);
 
-  // ===== FORM =====
+  // ===== FORM STATE =====
   const [form, setForm] = useState<FormState>({
-    name: "",
+    fio: "",
     phone: "",
-    city: "",
+    address: "",
+    area: "",
+    datetime: "",
     comment: "",
   });
 
@@ -86,32 +95,40 @@ export default function Home() {
   const [sentOk, setSentOk] = useState<null | "ok" | "err">(null);
 
   const formId = useId();
-  const cityInputRef = useRef<HTMLInputElement | null>(null);
+  const addressInputRef = useRef<HTMLInputElement | null>(null);
 
   const validate = (s: FormState): FormErrors => {
     const e: FormErrors = {};
 
-    if (!s.name.trim()) e.name = "Введите имя (можно коротко).";
+    if (!s.fio.trim()) e.fio = "Укажите ФИО (как в договоре).";
 
     const digits = phoneDigitsCount(s.phone);
-    // для РФ: +7 + 10 цифр = 11 всего (включая 7)
     if (digits > 0 && digits < 11) e.phone = "Телефон выглядит неполным.";
     if (digits === 0) e.phone = "Нужен номер телефона для связи.";
 
-    if (!s.city.trim()) e.city = "Укажите город/ЖК — так быстрее согласуем выезд.";
+    if (!s.address.trim()) e.address = "Укажите город и адрес ЖК.";
 
-    // comment — не обязателен
+    const areaNum = Number(String(s.area).replace(",", "."));
+    if (!s.area.trim()) e.area = "Укажите площадь (например, 75.5).";
+    else if (Number.isNaN(areaNum) || areaNum <= 0) e.area = "Площадь должна быть числом больше 0.";
+
+    if (!s.datetime.trim()) e.datetime = "Выберите дату и время осмотра.";
+
     return e;
   };
 
   const softFieldClass = (field: keyof FormState) => {
     const hasErr = !!errors[field] && !!touched[field];
+    const hasValue = String(form[field] ?? "").trim().length > 0;
+
     return [
       "w-full rounded-2xl border bg-white px-4 py-4 text-base text-black outline-none",
       "transition duration-300",
+      "shadow-[0_10px_30px_rgba(0,0,0,0.04)]",
       hasErr
         ? "border-black/15 shadow-[0_0_0_6px_rgba(0,0,0,0.04)]"
-        : "border-black/10 hover:border-black/15 focus:border-black/20 focus:shadow-[0_0_0_6px_rgba(255,196,0,0.18)]",
+        : "border-black/10 hover:border-black/15 focus:border-black/20 focus:shadow-[0_0_0_7px_rgba(255,196,0,0.22)]",
+      hasValue && !hasErr ? "ring-1 ring-black/5" : "",
     ].join(" ");
   };
 
@@ -120,30 +137,50 @@ export default function Home() {
 
     const nextErrors = validate(form);
     setErrors(nextErrors);
-    setTouched({ name: true, phone: true, city: true, comment: true });
+    setTouched({ fio: true, phone: true, address: true, area: true, datetime: true, comment: true });
 
     if (Object.keys(nextErrors).length) return;
 
     try {
       setSending(true);
 
+      const payload = {
+        fio: form.fio.trim(),
+        phone: form.phone.trim(),
+        address: form.address.trim(),
+        area: form.area.trim(),
+        datetime: form.datetime.trim(),
+        comment: form.comment.trim(),
+        // на всякий случай под старый API:
+        name: form.fio.trim(),
+        city: form.address.trim(),
+        page: typeof window !== "undefined" ? window.location.href : "",
+        summary:
+          `ФИО: ${form.fio.trim()}\n` +
+          `Адрес/ЖК: ${form.address.trim()}\n` +
+          `Площадь: ${form.area.trim()} м²\n` +
+          `Дата/время: ${form.datetime.trim()}\n` +
+          (form.comment.trim() ? `Комментарий: ${form.comment.trim()}` : ""),
+      };
+
       const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          city: form.city.trim(),
-          comment: form.comment.trim(),
-          page: typeof window !== "undefined" ? window.location.href : "",
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("bad_response");
       setSentOk("ok");
 
-      // лёгкий UX: чуть подчистим, но оставим город — чаще его вводят с картой
-      setForm((s) => ({ ...s, name: "", phone: "", comment: "" }));
+      setForm((s) => ({
+        ...s,
+        fio: "",
+        phone: "",
+        area: "",
+        datetime: "",
+        comment: "",
+        // address оставим (удобно для повторных заявок)
+      }));
       setTouched({});
       setErrors({});
     } catch {
@@ -153,29 +190,33 @@ export default function Home() {
     }
   };
 
-  // ===== AUTO-FILL CITY FROM GEO (через CustomEvent) =====
+  // ===== AUTO-FILL FROM GEO =====
   useEffect(() => {
     const handler = (evt: Event) => {
       const e = evt as CustomEvent<{ city?: string }>;
       const city = e.detail?.city?.trim();
       if (!city) return;
 
-      setForm((s) => ({ ...s, city }));
-      setTouched((t) => ({ ...t, city: true }));
+      setForm((s) => {
+        const hasAlready = s.address.trim().length > 0;
+        const next = hasAlready ? s.address : `${city}, `;
+        return { ...s, address: next };
+      });
+
+      setTouched((t) => ({ ...t, address: true }));
       setErrors((prev) => {
         const copy = { ...prev };
-        delete copy.city;
+        delete copy.address;
         return copy;
       });
 
-      // мягкий скролл к форме — “вау”-эффект
       const el = document.getElementById("form");
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-      // ✅ фокус в поле “Город / ЖК”
       window.setTimeout(() => {
-        cityInputRef.current?.focus();
-        cityInputRef.current?.select();
+        addressInputRef.current?.focus();
+        const len = addressInputRef.current?.value?.length ?? 0;
+        addressInputRef.current?.setSelectionRange(len, len);
       }, 450);
     };
 
@@ -183,15 +224,45 @@ export default function Home() {
     return () => window.removeEventListener("geo:city", handler as EventListener);
   }, []);
 
+  // ===== CHECKLIST (слева) =====
+  const checklist = useMemo(
+    () => [
+      {
+        n: "01",
+        title: "Полное ФИО дольщика",
+        hint: "Например: Иванов Иван Иванович",
+        done: form.fio.trim().length > 2,
+      },
+      {
+        n: "02",
+        title: "Город и адрес ЖК",
+        hint: 'Например: Евпатория, ЖК «Мойнаки», ул. …',
+        done: form.address.trim().length > 6,
+      },
+      {
+        n: "03",
+        title: "Общая площадь",
+        hint: "Например: 75.5 м²",
+        done: form.area.trim().length > 0 && !errors.area,
+      },
+      {
+        n: "04",
+        title: "Дата и время осмотра",
+        hint: "Например: 20.10.2025 12:00",
+        done: form.datetime.trim().length > 0,
+      },
+    ],
+    [form.fio, form.address, form.area, form.datetime, errors.area]
+  );
+
   return (
     <div className="min-h-screen bg-white text-black">
       {/* ========================= HEADER ========================= */}
       <header className="z-40">
-        {/* Верхняя белая полоса */}
+        {/* top white */}
         <div className="border-b border-black/10 bg-white">
           <div className="site-container">
             <div className="flex items-center justify-between gap-4 py-3 md:py-4">
-              {/* Логотип (кликабельный на главную) */}
               <Link
                 href="/"
                 aria-label="На главную"
@@ -207,7 +278,7 @@ export default function Home() {
                 />
               </Link>
 
-              {/* Телефон + соцсети (десктоп) */}
+              {/* desktop */}
               <div className="hidden items-center justify-end gap-5 md:flex">
                 <a
                   href={phoneLink}
@@ -238,13 +309,11 @@ export default function Home() {
                           <path d="M9.9 16.6l-.4 4.2c.6 0 .9-.3 1.2-.6l2.8-2.6 5.8 4.2c1.1.6 1.8.3 2.1-1l3.8-17.8c.4-1.6-.6-2.2-1.6-1.8L1.6 9.3c-1.5.6-1.5 1.5-.3 1.9l5.6 1.8 13-8.2c.6-.4 1.2-.2.8.2L9.9 16.6z" />
                         </svg>
                       )}
-
                       {s.icon === "vk" && (
                         <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
                           <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
                         </svg>
                       )}
-
                       {s.icon === "ig" && (
                         <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
                           <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm10 2H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm-5 4.2A3.8 3.8 0 1 1 8.2 12 3.8 3.8 0 0 1 12 8.2zm0 2A1.8 1.8 0 1 0 13.8 12 1.8 1.8 0 0 0 12 10.2zM17.7 6.1a1 1 0 1 1-1 1 1 1 0 0 1 1-1z" />
@@ -256,12 +325,11 @@ export default function Home() {
                       </span>
                     </a>
                   ))}
-
                   <span className="text-lg font-black text-black">*</span>
                 </div>
               </div>
 
-              {/* Мобилка */}
+              {/* mobile */}
               <div className="flex items-center justify-end gap-3 md:hidden">
                 <a href={phoneLink} className="btn-outline px-4 py-3 text-sm">
                   Позвонить
@@ -279,7 +347,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Чёрная полоса меню (sticky) */}
+        {/* sticky black nav */}
         <div className="sticky top-0 bg-black text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
           <div className="site-container">
             <nav className="hidden items-center gap-8 py-3 text-sm font-extrabold uppercase tracking-wide md:flex">
@@ -287,7 +355,6 @@ export default function Home() {
                 Главная
                 <span className="absolute bottom-0 left-0 h-0.5 w-full bg-[#ffc400]" />
               </a>
-
               <a className="pb-2 text-white/80 hover:text-white" href="#services">
                 Услуги
               </a>
@@ -317,7 +384,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Мобильное меню */}
+        {/* mobile drawer */}
         {mobileMenu ? (
           <div className="md:hidden">
             <button
@@ -371,65 +438,97 @@ export default function Home() {
 
       {/* ========================= CONTENT ========================= */}
       <main>
-        {/* HERO (уплотнён) */}
+        {/* HERO */}
         <section className="relative bg-white pt-4 md:pt-6">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -top-28 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-[#ffc400]/16 blur-3xl" />
-            <div className="absolute -top-32 -left-24 h-105 w-105 rounded-full bg-black/5 blur-3xl" />
-            <div className="absolute right-0 top-24 h-130 w-130 rounded-full bg-black/5 blur-3xl" />
-            <div className="absolute inset-x-0 top-0 h-20 bg-linear-to-b from-white via-white to-transparent" />
+            <div className="absolute -top-40 left-1/2 h-[560px] w-[920px] -translate-x-1/2 rounded-full bg-[#ffc400]/18 blur-[90px]" />
+            <div className="absolute -top-28 -left-24 h-[420px] w-[420px] rounded-full bg-black/6 blur-[80px]" />
+            <div className="absolute -bottom-48 right-[-140px] h-[520px] w-[520px] rounded-full bg-black/8 blur-[90px]" />
+            <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-white via-white to-transparent" />
+            <div className="absolute inset-0 opacity-[0.04] mix-blend-multiply [background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22%3E%3Cfilter id=%22n%22 x=%220%22 y=%220%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22120%22 height=%22120%22 filter=%22url(%23n)%22 opacity=%220.35%22/%3E%3C/svg%3E')]" />
           </div>
 
           <div className="site-container relative pb-12 md:pb-16">
-            <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_380px] md:items-start">
-              <div>
-                <div className="flex flex-wrap gap-3">
-                  <span className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
-                    Работаем по всему Крыму
-                  </span>
-                  <span className="inline-flex rounded-full bg-[#ffc400] px-4 py-2 text-xs font-bold text-black">
-                    Акт замечаний для застройщика
-                  </span>
+            <div className="grid items-stretch gap-8 md:grid-cols-[minmax(0,1fr)_380px] md:gap-10">
+              {/* LEFT */}
+              <div className="flex flex-col justify-between rounded-4xl border border-black/10 bg-white/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.08)] backdrop-blur-xl md:p-8 transition duration-300 hover:shadow-[0_28px_90px_rgba(255,196,0,0.18)]">
+                <div>
+                  <div className="flex flex-wrap gap-3">
+                    <span className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
+                      Работаем по всему Крыму
+                    </span>
+                    <span className="inline-flex rounded-full bg-[#ffc400] px-4 py-2 text-xs font-bold text-black shadow-[0_14px_45px_rgba(255,196,0,0.22)]">
+                      Акт замечаний для застройщика
+                    </span>
+                  </div>
+
+                  <h1 className="mt-5 text-[36px] font-extrabold leading-[1.02] tracking-tight md:text-[56px]">
+                    Профессиональная{" "}
+                    <span className="relative inline-block">
+                      <span className="text-[#ffc400]">приёмка</span>
+                      <span className="absolute -bottom-1 left-0 h-[6px] w-full rounded-full bg-[#ffc400]/40 blur-[0.2px]" />
+                    </span>{" "}
+                    квартир в новостройках
+                  </h1>
+
+                  <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/65 md:text-base">
+                    Проверим качество отделки, инженерные системы и площадь. Составим акт замечаний и подскажем, как
+                    добиться устранения дефектов.
+                  </p>
+
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    <a href="#form" className="btn-primary transition hover:-translate-y-0.5 active:translate-y-0">
+                      Записаться
+                    </a>
+                    <a href={phoneLink} className="btn-outline transition hover:-translate-y-0.5 active:translate-y-0">
+                      Позвонить
+                    </a>
+                    <a href="#services" className="btn-outline transition hover:-translate-y-0.5 active:translate-y-0">
+                      Услуги
+                    </a>
+                  </div>
+
+                  <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                    {[
+                      { top: "2–3 часа", bottom: "осмотр" },
+                      { top: "50+ пунктов", bottom: "проверки" },
+                      { top: "Фото/видео", bottom: "фиксация" },
+                    ].map((x) => (
+                      <div
+                        key={x.top}
+                        className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
+                      >
+                        <div className="font-extrabold text-black">{x.top}</div>
+                        <div className="text-black/55">{x.bottom}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <h1 className="mt-4 text-4xl font-extrabold leading-[1.05] tracking-tight md:mt-5 md:text-6xl">
-                  Профессиональная <span className="text-[#ffc400]">приёмка</span> квартир в новостройках
-                </h1>
-
-                <p className="mt-4 max-w-xl text-base leading-relaxed text-black/70">
-                  Проверим качество отделки, инженерные системы и площадь. Составим акт замечаний для застройщика и
-                  подскажем, как добиться устранения дефектов.
-                </p>
-
-                <div className="mt-7 flex flex-wrap gap-4">
-                  <a href="#form" className="btn-primary">
-                    Записаться
-                  </a>
-                  <a href={phoneLink} className="btn-outline">
-                    Позвонить
-                  </a>
-                </div>
-
-                <div className="mt-7 flex flex-wrap gap-x-10 gap-y-3 text-sm text-black/60">
-                  <div>
-                    <span className="font-extrabold text-black">2–3 часа</span> осмотр
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-black">50+ пунктов</span> проверки
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-black">Фото/видео</span> фиксация
+                <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4">
+                  <div className="text-xs text-black/55">{email}</div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-1 text-[12px] font-bold text-black/70">
+                    Выезд в день обращения
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-black/60" />
                   </div>
                 </div>
               </div>
 
-              <div className="relative mx-auto w-full max-w-95 md:mt-1">
-                <div className="absolute -left-3 top-3 h-[calc(100%-12px)] w-[calc(100%+12px)] rounded-3xl bg-[#ffc400]" />
+              {/* RIGHT */}
+              <div className="relative mx-auto w-full max-w-95 md:mt-0">
+                <div className="pointer-events-none absolute -left-2 top-2 h-[calc(100%-8px)] w-[calc(100%+8px)] rounded-4xl bg-[linear-gradient(180deg,rgba(255,196,0,0.95),rgba(255,196,0,0.55))] shadow-[0_22px_70px_rgba(255,196,0,0.25)]" />
+                <div className="pointer-events-none absolute -left-3 top-3 h-[calc(100%-12px)] w-[calc(100%+12px)] rounded-4xl bg-[#ffc400]/25 blur-[12px]" />
 
-                <div className="relative overflow-hidden rounded-3xl bg-white shadow-[0_22px_70px_rgba(0,0,0,0.14)] ring-1 ring-black/10">
+                <div className="group relative overflow-hidden rounded-4xl bg-white shadow-[0_26px_80px_rgba(0,0,0,0.16)] ring-1 ring-black/10 transition hover:-translate-y-1 hover:shadow-[0_34px_100px_rgba(0,0,0,0.22)]">
+                  <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-500 group-hover:opacity-100">
+                    <div className="absolute -left-28 top-0 h-full w-44 rotate-[18deg] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.65),transparent)] blur-[0.6px]" />
+                  </div>
+
+                  <div className="pointer-events-none absolute inset-0 rounded-4xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)]" />
+
                   <div className="p-4 md:p-5">
                     <div className="mx-auto w-full max-w-85">
-                      <div className="relative overflow-hidden rounded-3xl bg-black/5">
+                      <div className="relative overflow-hidden rounded-4xl bg-black/5">
                         <Image
                           src="/brand/sergey.jpg"
                           alt="Негода Сергей Владимирович"
@@ -437,13 +536,15 @@ export default function Home() {
                           height={420}
                           priority
                           className="h-auto w-full object-contain"
+                          style={{ height: "auto" }}
                         />
+                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(255,255,255,0.16),transparent_55%),radial-gradient(circle_at_50%_85%,rgba(0,0,0,0.08),transparent_55%)]" />
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between gap-3 px-5 pb-4">
-                    <div className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
+                    <div className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white shadow-[0_14px_45px_rgba(0,0,0,0.20)]">
                       Выезд в день обращения • Крым
                     </div>
                     <div className="hidden text-xs font-bold text-black/50 md:block">Документ • Гарантия • Опыт</div>
@@ -474,7 +575,7 @@ export default function Home() {
         <div className="h-8 md:h-12" />
         <FAQ />
 
-        {/* ========================= FORM (ULTRA) ========================= */}
+        {/* ========================= FORM (NEW) ========================= */}
         <div className="h-8 md:h-12" />
         <section id="form" className="bg-white">
           <div className="site-container py-18 md:py-22">
@@ -493,13 +594,53 @@ export default function Home() {
                   </div>
 
                   <h2 className="mt-5 text-3xl font-extrabold tracking-tight md:text-5xl">
-                    Оставьте заявку — перезвоним и уточним детали
+                    Запись на приёмку и расчёт стоимости
                   </h2>
 
                   <p className="mt-4 max-w-xl text-black/60">
-                    Город, ЖК и удобное время — этого достаточно, чтобы договориться о выезде.
-                    <span className="ml-1 text-black/60">Можете выбрать город на карте — он подставится сам.</span>
+                    Чтобы оперативно записать вас и точно рассчитать стоимость, заполните 4 пункта ниже.
                   </p>
+
+                  {/* чек-лист (дорого) */}
+                  <div className="mt-7 grid max-w-xl gap-3">
+                    {checklist.map((c) => (
+                      <div
+                        key={c.n}
+                        className={[
+                          "group relative overflow-hidden rounded-3xl border bg-white/70 px-5 py-4 backdrop-blur-xl",
+                          "transition duration-300",
+                          c.done
+                            ? "border-black/10 shadow-[0_14px_45px_rgba(255,196,0,0.16)]"
+                            : "border-black/10 shadow-[0_12px_40px_rgba(0,0,0,0.05)]",
+                        ].join(" ")}
+                      >
+                        <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100">
+                          <div className="absolute inset-x-0 bottom-0 h-10 bg-[radial-gradient(ellipse_at_bottom,rgba(255,196,0,0.22),transparent_70%)]" />
+                        </div>
+
+                        <div className="relative flex items-start gap-3">
+                          <div className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-black text-xs font-extrabold text-white">
+                            {c.n}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-extrabold text-black">{c.title}</div>
+                              <span
+                                className={[
+                                  "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-extrabold",
+                                  c.done ? "bg-[#ffc400]/25 text-black" : "bg-black/5 text-black/55",
+                                ].join(" ")}
+                              >
+                                {c.done ? "готово" : "нужно"}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm text-black/55">{c.hint}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
                   <div className="mt-8 grid max-w-xl gap-3">
                     <div className="rounded-2xl border border-black/10 bg-white/70 p-4">
@@ -520,15 +661,12 @@ export default function Home() {
                       </div>
                     </a>
 
-                    <div className="mt-2 text-sm text-black/50">
-                      Обычно отвечаем быстро. Без спама и “продаж по телефону”.
-                    </div>
+                    <div className="mt-2 text-sm text-black/50">Без спама. Данные только для записи и расчёта.</div>
                   </div>
                 </div>
 
                 {/* RIGHT */}
                 <div className="relative">
-                  {/* статус отправки */}
                   {sentOk ? (
                     <div
                       className={[
@@ -539,7 +677,7 @@ export default function Home() {
                       ].join(" ")}
                     >
                       {sentOk === "ok" ? (
-                        <span>✅ Заявка отправлена. Если нужно — уточним детали по телефону.</span>
+                        <span>✅ Заявка отправлена. Мы перезвоним и уточним детали.</span>
                       ) : (
                         <span>
                           ⚠️ Не получилось отправить. Попробуйте ещё раз или позвоните:{" "}
@@ -559,23 +697,23 @@ export default function Home() {
                     }}
                   >
                     <label className="group/field relative">
-                      <span className="mb-2 block text-xs font-bold text-black/60">Ваше имя</span>
+                      <span className="mb-2 block text-xs font-bold text-black/60">Полное ФИО дольщика</span>
                       <input
-                        value={form.name}
+                        value={form.fio}
                         onChange={(e) => {
                           const v = e.target.value;
-                          setForm((s) => ({ ...s, name: v }));
-                          if (touched.name) setErrors(validate({ ...form, name: v }));
+                          setForm((s) => ({ ...s, fio: v }));
+                          if (touched.fio) setErrors(validate({ ...form, fio: v }));
                         }}
                         onBlur={() => {
-                          setTouched((t) => ({ ...t, name: true }));
+                          setTouched((t) => ({ ...t, fio: true }));
                           setErrors(validate(form));
                         }}
-                        placeholder="Например, Анна"
-                        className={softFieldClass("name")}
+                        placeholder="Например: Иванов Иван Иванович"
+                        className={softFieldClass("fio")}
                       />
-                      {touched.name && errors.name ? (
-                        <div className="mt-2 text-xs text-black/50">{errors.name}</div>
+                      {touched.fio && errors.fio ? (
+                        <div className="mt-2 text-xs text-black/50">{errors.fio}</div>
                       ) : (
                         <div className="mt-2 text-xs text-black/30"> </div>
                       )}
@@ -606,39 +744,85 @@ export default function Home() {
                     </label>
 
                     <label className="group/field relative">
-                      <span className="mb-2 block text-xs font-bold text-black/60">Город / ЖК</span>
+                      <span className="mb-2 block text-xs font-bold text-black/60">Город и полный адрес ЖК</span>
                       <input
-                        ref={cityInputRef}
-                        value={form.city}
+                        ref={addressInputRef}
+                        value={form.address}
                         onChange={(e) => {
                           const v = e.target.value;
-                          setForm((s) => ({ ...s, city: v }));
-                          if (touched.city) setErrors(validate({ ...form, city: v }));
+                          setForm((s) => ({ ...s, address: v }));
+                          if (touched.address) setErrors(validate({ ...form, address: v }));
                         }}
                         onBlur={() => {
-                          setTouched((t) => ({ ...t, city: true }));
+                          setTouched((t) => ({ ...t, address: true }));
                           setErrors(validate(form));
                         }}
-                        placeholder="Севастополь, ЖК …"
-                        className={softFieldClass("city")}
+                        placeholder='Например: Евпатория, ЖК "Мойнаки", ул. 50 лет СССР, дом 20, кв.35'
+                        className={softFieldClass("address")}
                       />
-                      {touched.city && errors.city ? (
-                        <div className="mt-2 text-xs text-black/50">{errors.city}</div>
+                      {touched.address && errors.address ? (
+                        <div className="mt-2 text-xs text-black/50">{errors.address}</div>
                       ) : (
                         <div className="mt-2 text-xs text-black/30"> </div>
                       )}
                     </label>
 
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <label className="group/field relative">
+                        <span className="mb-2 block text-xs font-bold text-black/60">Общая площадь (м²)</span>
+                        <input
+                          inputMode="decimal"
+                          value={form.area}
+                          onChange={(e) => {
+                            const v = normalizeArea(e.target.value);
+                            setForm((s) => ({ ...s, area: v }));
+                            if (touched.area) setErrors(validate({ ...form, area: v }));
+                          }}
+                          onBlur={() => {
+                            setTouched((t) => ({ ...t, area: true }));
+                            setErrors(validate(form));
+                          }}
+                          placeholder="Например: 75.5"
+                          className={softFieldClass("area")}
+                        />
+                        {touched.area && errors.area ? (
+                          <div className="mt-2 text-xs text-black/50">{errors.area}</div>
+                        ) : (
+                          <div className="mt-2 text-xs text-black/30"> </div>
+                        )}
+                      </label>
+
+                      <label className="group/field relative">
+                        <span className="mb-2 block text-xs font-bold text-black/60">Дата и время осмотра</span>
+                        <input
+                          type="datetime-local"
+                          value={form.datetime}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setForm((s) => ({ ...s, datetime: v }));
+                            if (touched.datetime) setErrors(validate({ ...form, datetime: v }));
+                          }}
+                          onBlur={() => {
+                            setTouched((t) => ({ ...t, datetime: true }));
+                            setErrors(validate(form));
+                          }}
+                          className={softFieldClass("datetime")}
+                        />
+                        {touched.datetime && errors.datetime ? (
+                          <div className="mt-2 text-xs text-black/50">{errors.datetime}</div>
+                        ) : (
+                          <div className="mt-2 text-xs text-black/30"> </div>
+                        )}
+                      </label>
+                    </div>
+
                     <label className="group/field relative">
                       <span className="mb-2 block text-xs font-bold text-black/60">Комментарий (необязательно)</span>
                       <textarea
                         value={form.comment}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setForm((s) => ({ ...s, comment: v }));
-                        }}
+                        onChange={(e) => setForm((s) => ({ ...s, comment: e.target.value }))}
                         onBlur={() => setTouched((t) => ({ ...t, comment: true }))}
-                        placeholder="Площадь, отделка/без, когда планируете приёмку…"
+                        placeholder="Отделка/без, этаж, пожелания…"
                         className={[softFieldClass("comment"), "min-h-28 resize-none"].join(" ")}
                       />
                       <div className="mt-2 text-xs text-black/30"> </div>
@@ -657,9 +841,9 @@ export default function Home() {
                         "ring-1 ring-black/10",
                       ].join(" ")}
                     >
-                      {sending ? "Отправляем…" : "Отправить"}
+                      {sending ? "Отправляем…" : "Отправить заявку"}
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-black/60" />
-                      <span className="text-sm font-bold text-black/70">1–2 минуты</span>
+                      <span className="text-sm font-bold text-black/70">быстро</span>
                     </button>
 
                     <div id={formId} className="text-center text-xs text-black/50">

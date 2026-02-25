@@ -6,197 +6,249 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type DocItem = {
   src: string;
   title: string;
-  subtitle?: string;
+  subtitle: string;
 };
 
+function cx(...v: Array<string | false | null | undefined>) {
+  return v.filter(Boolean).join(" ");
+}
+
+function useLockBodyScroll(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+
+    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (scrollBarWidth > 0) document.body.style.paddingRight = `${scrollBarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+    };
+  }, [open]);
+}
+
 export default function Docs() {
-  const docs = useMemo<DocItem[]>(
+  // ✅ ТВОИ АКТУАЛЬНЫЕ ДОКИ (без золотых плашек/годов)
+  const docs: DocItem[] = useMemo(
     () => [
-      { src: "/docs/nostroy.jpg", title: "НОСТРОЙ", subtitle: "Включение в реестр специалистов" },
-      { src: "/docs/diplom.jpg", title: "Диплом", subtitle: "Профпереподготовка" },
-      { src: "/docs/technonikol.jpg", title: "ТехноНИКОЛЬ", subtitle: "Сертификат семинара" },
-      { src: "/docs/poverki.jpg", title: "Поверки", subtitle: "Свидетельства и сертификаты" },
+      {
+        src: "/docs/diploms.jpg",
+        title: "Реестр специалистов",
+        subtitle: "Официальное включение в НРС",
+      },
+      {
+        src: "/docs/diploms2.jpg",
+        title: "Судебная экспертиза",
+        subtitle: "Строительно-техническое направление",
+      },
+      {
+        src: "/docs/diploms3.jpg",
+        title: "Промышленное и гражданское строительство",
+        subtitle: "Профессиональная переподготовка",
+      },
+      {
+        src: "/docs/diploms4.jpg",
+        title: "Поверки оборудования",
+        subtitle: "Действующие сертификаты и калибровки",
+      },
     ],
     []
   );
 
-  const [open, setOpen] = useState(false);
-  const [idx, setIdx] = useState(0);
+  // ===== reveal on scroll (как в сервисах) =====
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [seen, setSeen] = useState<Record<number, boolean>>({});
 
-  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
-
-  const openAt = (i: number) => {
-    setIdx(i);
-    setOpen(true);
-  };
-
-  const close = () => setOpen(false);
-  const prev = () => setIdx((s) => (s - 1 + docs.length) % docs.length);
-  const next = () => setIdx((s) => (s + 1) % docs.length);
-
-  // блокируем скролл страницы
   useEffect(() => {
-    if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open]);
+    const root = wrapRef.current;
+    if (!root) return;
 
-  // esc + стрелки
+    const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-doc-card]"));
+    if (!cards.length) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const idxStr = (e.target as HTMLElement).dataset.docCard;
+          const idx = idxStr ? Number(idxStr) : NaN;
+          if (!Number.isNaN(idx)) {
+            setSeen((s) => (s[idx] ? s : { ...s, [idx]: true }));
+          }
+          io.unobserve(e.target);
+        }
+      },
+      { threshold: 0.18, rootMargin: "80px 0px -10% 0px" }
+    );
+
+    cards.forEach((c) => io.observe(c));
+    return () => io.disconnect();
+  }, []);
+
+  // ===== modal viewer =====
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+
+  useLockBodyScroll(open);
+
+  const current = docs[active];
+
+  const goPrev = () => setActive((i) => (i - 1 + docs.length) % docs.length);
+  const goNext = () => setActive((i) => (i + 1) % docs.length);
+
   useEffect(() => {
     if (!open) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key === "ArrowLeft") prev();
-      if (e.key === "ArrowRight") next();
+      if (e.key === "Escape") setOpen(false);
+      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowRight") goNext();
     };
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+    // ✅ фикс твоей ошибки: зависимости всегда одинаковые по размеру
+  }, [open, docs.length]);
 
   return (
-    <section id="docs" className="bg-white">
-      <div className="site-container py-16 md:py-20">
-        <div className="mb-8">
-          <div className="text-sm font-semibold text-black/50">Документы</div>
-          <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-5xl">
-            Подтверждение квалификации
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-black/60">
-            Нажмите на документ — откроется просмотр.
+    <section id="docs" className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
+      <div className="flex items-end justify-between gap-6">
+        <div>
+          <div className="text-[12px] uppercase tracking-[0.18em] text-black/45">Документы</div>
+          <h2 className="mt-2 text-2xl font-semibold md:text-3xl">Подтверждение квалификации</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-black/60 md:text-[15px]">
+            Дипломы, уведомления и поверки оборудования. Нажмите на документ — откроется просмотр.
           </p>
         </div>
+      </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {docs.map((d, i) => (
+      <div ref={wrapRef} className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {docs.map((d, idx) => {
+          const isSeen = !!seen[idx];
+
+          return (
             <button
               key={d.src}
               type="button"
-              onClick={() => openAt(i)}
-              className={[
-                "group relative overflow-hidden rounded-3xl border border-black/10 bg-white text-left",
-                "shadow-[0_22px_70px_rgba(0,0,0,0.08)] transition",
-                "hover:-translate-y-0.5 hover:shadow-[0_28px_90px_rgba(0,0,0,0.12)]",
-                "focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40",
-              ].join(" ")}
-              style={{ cursor: "pointer" }}
+              data-doc-card={idx}
+              className={cx(
+                "group relative overflow-hidden rounded-3xl border border-black/10 bg-white/70 text-left",
+                "shadow-[0_12px_40px_rgba(0,0,0,0.06)] backdrop-blur-xl",
+                "transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_70px_rgba(0,0,0,0.10)]",
+                "focus:outline-none focus:ring-2 focus:ring-black/10",
+                // reveal
+                "motion-reduce:transform-none motion-reduce:transition-none",
+                isSeen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+              )}
+              style={{ transitionDelay: `${Math.min(idx * 70, 280)}ms` }}
+              onClick={() => {
+                setActive(idx);
+                setOpen(true);
+              }}
+              aria-label={`Открыть документ: ${d.title}`}
             >
-              <div className="relative aspect-[3/4] w-full bg-black/[0.02]">
+              {/* мягкий “премиум” блик при ховере + свечение ТОЛЬКО снизу */}
+              <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-500 group-hover:opacity-100">
+                <div className="absolute -left-24 top-0 h-full w-40 rotate-[18deg] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.7),transparent)] blur-[0.6px]" />
+                <div className="absolute inset-x-0 bottom-0 h-10 bg-[radial-gradient(ellipse_at_bottom,rgba(255,196,0,0.22),transparent_70%)]" />
+              </div>
+
+              <div className="relative aspect-[4/5] w-full bg-black/[0.03]">
                 <Image
                   src={d.src}
                   alt={d.title}
                   fill
-                  sizes="(max-width: 768px) 100vw, 25vw"
-                  className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 280px"
+                  className="object-cover"
+                  priority={idx < 2}
                 />
               </div>
 
-              <div className="p-4">
-                <div className="text-sm font-extrabold tracking-tight">{d.title}</div>
-                {d.subtitle && (
-                  <div className="mt-1 text-xs font-semibold text-black/55">{d.subtitle}</div>
-                )}
+              <div className="relative border-t border-black/10 p-4">
+                <div className="text-sm font-semibold leading-snug">{d.title}</div>
+                <div className="mt-1 text-sm text-black/60">{d.subtitle}</div>
+
+                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-black/70">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ffc400]" />
+                  Смотреть
+                </div>
               </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* MODAL */}
-      {open && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center">
-          {/* backdrop */}
+      {/* ===== MODAL ===== */}
+      {open && current ? (
+        <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true">
           <button
-            type="button"
-            className="absolute inset-0 bg-black/60 backdrop-blur-[6px]"
-            onClick={close}
             aria-label="Закрыть"
+            className="absolute inset-0 cursor-pointer bg-black/55 backdrop-blur-[6px]"
+            onClick={() => setOpen(false)}
           />
 
-          {/* окно */}
-          <div className="relative z-[91] mx-auto w-[94vw] max-w-4xl">
-            <div className="overflow-hidden rounded-4xl border border-white/10 bg-white shadow-[0_30px_120px_rgba(0,0,0,0.35)] animate-[fadeIn_.3s_ease]">
-              
-              {/* topbar */}
-              <div className="flex items-center justify-between gap-3 border-b border-black/10 px-5 py-3">
-                <div>
-                  <div className="text-sm font-extrabold text-black">{docs[idx].title}</div>
-                  <div className="text-xs font-semibold text-black/50">
-                    {docs[idx].subtitle ?? "Документ"}
+          <div className="relative mx-auto mt-6 w-[min(1100px,calc(100%-20px))] md:mt-10">
+            <div className="animate-in fade-in zoom-in-95 duration-200 rounded-3xl border border-black/10 bg-white/90 shadow-[0_30px_90px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+              <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4 md:px-7">
+                <div className="min-w-0">
+                  <div className="text-[12px] uppercase tracking-[0.18em] text-black/45">
+                    Документы • {active + 1} / {docs.length}
                   </div>
+                  <div className="mt-1 text-lg font-semibold leading-tight md:text-xl">{current.title}</div>
+                  <div className="mt-1 text-sm text-black/55">{current.subtitle}</div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button className="btn-outline px-3 py-2" onClick={prev}>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={goPrev}
+                    className="cursor-pointer rounded-full border border-black/10 bg-white/70 px-3 py-2 text-sm font-medium transition hover:bg-white"
+                    aria-label="Предыдущий документ"
+                  >
                     ←
                   </button>
-                  <button className="btn-outline px-3 py-2" onClick={next}>
+                  <button
+                    onClick={goNext}
+                    className="cursor-pointer rounded-full border border-black/10 bg-white/70 px-3 py-2 text-sm font-medium transition hover:bg-white"
+                    aria-label="Следующий документ"
+                  >
                     →
                   </button>
                   <button
-                    ref={closeBtnRef}
-                    className="btn-outline px-3 py-2"
-                    onClick={close}
+                    onClick={() => setOpen(false)}
+                    className="cursor-pointer rounded-full border border-black/10 bg-white/70 px-4 py-2 text-sm font-medium transition hover:bg-white"
                   >
-                    ✕
+                    Закрыть
                   </button>
                 </div>
               </div>
 
-              {/* красивый скролл */}
-              <div className="max-h-[78vh] overflow-y-auto docs-scroll bg-black/[0.02] p-6">
-                <div className="relative mx-auto w-full max-w-[900px] overflow-hidden rounded-3xl bg-white shadow-[0_24px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/10">
-                  <Image
-                    src={docs[idx].src}
-                    alt={docs[idx].title}
-                    width={1200}
-                    height={1600}
-                    className="h-auto w-full"
-                    priority
-                  />
+              <div className="max-h-[78vh] overflow-auto p-4 md:p-6">
+                <div className="relative mx-auto w-full max-w-[920px] overflow-hidden rounded-2xl border border-black/10 bg-white">
+                  <div className="group relative">
+                    <Image
+                      src={current.src}
+                      alt={current.title}
+                      width={1200}
+                      height={1600}
+                      className="h-auto w-full object-contain transition duration-500 group-hover:scale-[1.02]"
+                      style={{ height: "auto" }}
+                      priority
+                    />
+                    {/* лёгкая виньетка, без “засвета” */}
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(255,255,255,0.18),transparent_55%),radial-gradient(circle_at_50%_90%,rgba(0,0,0,0.10),transparent_55%)]" />
+                  </div>
                 </div>
-              </div>
 
-              <div className="border-t border-black/10 px-5 py-3 text-xs font-semibold text-black/50">
-                {idx + 1} / {docs.length}
+                <div className="mt-3 text-center text-xs text-black/45">Подсказка: ← → листают, Esc закрывает</div>
               </div>
             </div>
           </div>
-
-          {/* стили скролла */}
-          <style jsx>{`
-            .docs-scroll::-webkit-scrollbar {
-              width: 8px;
-            }
-            .docs-scroll::-webkit-scrollbar-track {
-              background: transparent;
-            }
-            .docs-scroll::-webkit-scrollbar-thumb {
-              background: rgba(255, 196, 0, 0.7);
-              border-radius: 20px;
-              transition: background 0.3s ease;
-            }
-            .docs-scroll::-webkit-scrollbar-thumb:hover {
-              background: rgba(255, 196, 0, 1);
-            }
-
-            /* Firefox */
-            .docs-scroll {
-              scrollbar-width: thin;
-              scrollbar-color: rgba(255,196,0,0.7) transparent;
-            }
-
-            @keyframes fadeIn {
-              from { opacity: 0; transform: translateY(10px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-          `}</style>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
