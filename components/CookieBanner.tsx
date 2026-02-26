@@ -15,12 +15,20 @@ export default function CookieBanner() {
   useEffect(() => {
     setMounted(true);
 
+    // показать баннер при первом заходе (если выбора ещё нет)
     try {
       const v = localStorage.getItem(KEY) as ConsentLevel | null;
       if (!v) setShow(true);
     } catch {
       setShow(true);
     }
+  }, []);
+
+  // ✅ открыть “настройки cookies” по кнопке из футера
+  useEffect(() => {
+    const open = () => setShow(true);
+    window.addEventListener("kq:open_cookies_settings", open);
+    return () => window.removeEventListener("kq:open_cookies_settings", open);
   }, []);
 
   // чтобы баннер не перекрывал контент
@@ -41,7 +49,7 @@ export default function CookieBanner() {
       localStorage.setItem(KEY, level);
     } catch {}
 
-    // на будущее: можно слушать и включать/выключать аналитику
+    // можно слушать и включать/выключать аналитику (если появится)
     try {
       window.dispatchEvent(new CustomEvent("cookies:consent", { detail: { level } }));
     } catch {}
@@ -72,7 +80,11 @@ export default function CookieBanner() {
             <div className="min-w-0">
               <div className="text-sm font-extrabold text-black">Cookies</div>
               <p className="mt-1 text-sm text-black/60">
-                Мы используем cookies для работы сайта и (с согласия) аналитики. Подробнее — в{" "}
+                Мы используем cookies для работы сайта. Подробнее — в{" "}
+                <Link href="/cookies" className="font-bold underline underline-offset-2 hover:text-black">
+                  политике cookies
+                </Link>{" "}
+                и{" "}
                 <Link href="/privacy" className="font-bold underline underline-offset-2 hover:text-black">
                   политике конфиденциальности
                 </Link>
@@ -81,27 +93,15 @@ export default function CookieBanner() {
             </div>
 
             <div className="flex flex-wrap gap-2 md:shrink-0 md:justify-end">
-              <button
-                type="button"
-                onClick={() => setConsent("rejected")}
-                className="btn-outline px-4 py-3 text-sm"
-              >
+              <button type="button" onClick={() => setConsent("rejected")} className="btn-outline px-4 py-3 text-sm">
                 Отклонить
               </button>
 
-              <button
-                type="button"
-                onClick={() => setConsent("essential")}
-                className="btn-outline px-4 py-3 text-sm"
-              >
+              <button type="button" onClick={() => setConsent("essential")} className="btn-outline px-4 py-3 text-sm">
                 Только обязательные
               </button>
 
-              <button
-                type="button"
-                onClick={() => setConsent("all")}
-                className="btn-primary px-5 py-3 text-sm"
-              >
+              <button type="button" onClick={() => setConsent("all")} className="btn-primary px-5 py-3 text-sm">
                 Принять все
               </button>
             </div>
