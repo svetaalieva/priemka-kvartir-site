@@ -286,14 +286,32 @@ function MailModal({
                 </a>
               </div>
 
-              <div className="mt-2 text-xs text-black/45">
-                Подсказка: письмо уже заполнено данными из формы — останется только отправить.
-              </div>
+              <div className="mt-2 text-xs text-black/45">Подсказка: письмо уже заполнено данными из формы — останется только отправить.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** ✅ Лейбл с пометкой обязательности (не ломает верстку) */
+function FieldLabel({
+  children,
+  required,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <span className="mb-2 block text-xs font-bold text-black/60">
+      {children}
+      {required ? (
+        <span className="ml-1 font-extrabold text-black/60" title="Обязательное поле">
+          (обязательно)
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -555,14 +573,7 @@ export default function Home() {
                 aria-label="На главную"
                 className="inline-flex items-center rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc400]/60"
               >
-                <Image
-                  src="/brand/logo-horizontal.png"
-                  alt="Контроль качества"
-                  width={520}
-                  height={140}
-                  priority
-                  className="h-12 w-auto md:h-16"
-                />
+                <Image src="/brand/logo-horizontal.png" alt="Контроль качества" width={520} height={140} priority className="h-12 w-auto md:h-16" />
               </Link>
 
               {/* desktop */}
@@ -780,7 +791,10 @@ export default function Home() {
                       { top: "50+ пунктов", bottom: "проверки" },
                       { top: "Фото/видео", bottom: "фиксация" },
                     ].map((x) => (
-                      <div key={x.top} className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+                      <div
+                        key={x.top}
+                        className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
+                      >
                         <div className="font-extrabold text-black">{x.top}</div>
                         <div className="text-black/55">{x.bottom}</div>
                       </div>
@@ -984,8 +998,9 @@ export default function Home() {
                     }}
                   >
                     <label className="group/field relative">
-                      <span className="mb-2 block text-xs font-bold text-black/60">Полное ФИО дольщика</span>
+                      <FieldLabel required>Полное ФИО дольщика</FieldLabel>
                       <input
+                        required
                         value={form.fio}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -1003,8 +1018,9 @@ export default function Home() {
                     </label>
 
                     <label className="group/field relative">
-                      <span className="mb-2 block text-xs font-bold text-black/60">Телефон</span>
+                      <FieldLabel required>Телефон</FieldLabel>
                       <input
+                        required
                         inputMode="tel"
                         value={form.phone}
                         onChange={(e) => {
@@ -1023,8 +1039,9 @@ export default function Home() {
                     </label>
 
                     <label className="group/field relative">
-                      <span className="mb-2 block text-xs font-bold text-black/60">Город и полный адрес ЖК</span>
+                      <FieldLabel required>Город и полный адрес ЖК</FieldLabel>
                       <input
+                        required
                         ref={addressInputRef}
                         value={form.address}
                         onChange={(e) => {
@@ -1044,8 +1061,9 @@ export default function Home() {
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <label className="group/field relative">
-                        <span className="mb-2 block text-xs font-bold text-black/60">Общая площадь (м²)</span>
+                        <FieldLabel required>Общая площадь (м²)</FieldLabel>
                         <input
+                          required
                           inputMode="decimal"
                           value={form.area}
                           onChange={(e) => {
@@ -1064,8 +1082,9 @@ export default function Home() {
                       </label>
 
                       <label className="group/field relative">
-                        <span className="mb-2 block text-xs font-bold text-black/60">Дата и время осмотра</span>
+                        <FieldLabel required>Дата и время осмотра</FieldLabel>
                         <input
+                          required
                           type="datetime-local"
                           value={form.datetime}
                           onChange={(e) => {
@@ -1079,16 +1098,12 @@ export default function Home() {
                           }}
                           className={softFieldClass("datetime")}
                         />
-                        {touched.datetime && errors.datetime ? (
-                          <div className="mt-2 text-xs text-black/50">{errors.datetime}</div>
-                        ) : (
-                          <div className="mt-2 text-xs text-black/30"> </div>
-                        )}
+                        {touched.datetime && errors.datetime ? <div className="mt-2 text-xs text-black/50">{errors.datetime}</div> : <div className="mt-2 text-xs text-black/30"> </div>}
                       </label>
                     </div>
 
                     <label className="group/field relative">
-                      <span className="mb-2 block text-xs font-bold text-black/60">Комментарий (необязательно)</span>
+                      <FieldLabel>Комментарий (необязательно)</FieldLabel>
                       <textarea
                         value={form.comment}
                         onChange={(e) => setForm((s) => ({ ...s, comment: e.target.value }))}
@@ -1120,11 +1135,7 @@ export default function Home() {
                     {/* ✅ ОДНА ссылка вместо 5 — открывает модалку */}
                     <div className="text-center text-xs text-black/55">
                       Не открывается?{" "}
-                      <button
-                        type="button"
-                        onClick={() => setMailModalOpen(true)}
-                        className="font-bold underline underline-offset-2 hover:text-black cursor-pointer"
-                      >
+                      <button type="button" onClick={() => setMailModalOpen(true)} className="font-bold underline underline-offset-2 hover:text-black cursor-pointer">
                         Отправить письмом
                       </button>
                     </div>
