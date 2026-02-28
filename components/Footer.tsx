@@ -2,21 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useMemo } from "react";
 
 type Social = {
   name: string;
   href: string;
-  icon: "tg" | "vk" | "ig";
+  icon: "tg" | "vk";
 };
 
-const socials: Social[] = [
-  { name: "Telegram", href: "#", icon: "tg" },
-  { name: "VK", href: "#", icon: "vk" },
-  { name: "Instagram", href: "#", icon: "ig" },
-];
-
+// ✅ Иконка соцсети (только TG/VK, Instagram убран полностью)
 function SocialIcon({ icon }: { icon: Social["icon"] }) {
   const cls = "h-5 w-5";
+
   if (icon === "tg") {
     return (
       <svg viewBox="0 0 24 24" className={cls} fill="currentColor" aria-hidden="true">
@@ -24,16 +21,11 @@ function SocialIcon({ icon }: { icon: Social["icon"] }) {
       </svg>
     );
   }
-  if (icon === "vk") {
-    return (
-      <svg viewBox="0 0 24 24" className={cls} fill="currentColor" aria-hidden="true">
-        <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
-      </svg>
-    );
-  }
+
+  // icon === "vk"
   return (
     <svg viewBox="0 0 24 24" className={cls} fill="currentColor" aria-hidden="true">
-      <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm10 2H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm-5 4.2A3.8 3.8 0 1 1 8.2 12 3.8 3.8 0 0 1 12 8.2zm0 2A1.8 1.8 0 1 0 13.8 12 1.8 1.8 0 0 0 12 10.2zM17.7 6.1a1 1 0 1 1-1 1 1 1 0 0 1 1-1z" />
+      <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
     </svg>
   );
 }
@@ -42,6 +34,15 @@ export default function Footer() {
   const phoneDisplay = "+7 (978) 704-33-16";
   const phoneLink = "tel:+79787043316";
   const email = "i@snegoda.ru";
+
+  // ✅ Соцсети (реальные ссылки) — только TG/VK
+  const socials: Social[] = useMemo(
+    () => [
+      { name: "Telegram", href: "https://t.me/kontrolkachestvacrimea", icon: "tg" },
+      { name: "VK", href: "https://vk.com/kontrolkachestvacrimea", icon: "vk" },
+    ],
+    []
+  );
 
   return (
     <footer className="relative overflow-hidden bg-black text-white">
@@ -96,6 +97,8 @@ export default function Footer() {
                         <a
                           key={s.name}
                           href={s.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           aria-label={s.name}
                           title={s.name}
                           className={[
@@ -126,11 +129,7 @@ export default function Footer() {
                     ["География", "#geo"],
                     ["Оставить заявку", "#form"],
                   ].map(([t, href]) => (
-                    <a
-                      key={href}
-                      href={href}
-                      className="group inline-flex items-center gap-2 transition hover:text-white"
-                    >
+                    <a key={href} href={href} className="group inline-flex items-center gap-2 transition hover:text-white">
                       <span className="h-1.5 w-1.5 rounded-full bg-white/20 transition group-hover:bg-[#ffc400]/80" />
                       {t}
                     </a>
@@ -159,12 +158,10 @@ export default function Footer() {
                   </div>
 
                   <div className="mt-5">
-                    {/* если btn-primary уже “дорогая” — оставляем */}
                     <a href="#form" className="btn-primary w-full text-center">
                       Оставить заявку
                     </a>
 
-                    {/* микродеталь премиум */}
                     <div className="mt-3 text-[11px] leading-relaxed text-white/50">
                       Ответим в течение дня. Без спама и рассылок.
                     </div>

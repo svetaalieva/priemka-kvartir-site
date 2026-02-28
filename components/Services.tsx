@@ -27,8 +27,21 @@ function cx(...v: Array<string | false | null | undefined>) {
   return v.filter(Boolean).join(" ");
 }
 
-function useLockBodyScroll(open: boolean) {
-  const scrollYRef = useRef(0);
+/**
+ * ✅ БЕЗ ДЁРГАНИЙ:
+ * - фиксируем body (position: fixed)
+ * - при закрытии возвращаем скролл в requestAnimationFrame (и ещё раз во второй кадр)
+ *   чтобы браузер не показывал промежуточное положение (особенно Safari/Chrome).
+ */
+  /**
+ * ✅ СУПЕР-ФИКС БЕЗ ДЁРГАНИЙ:
+ * - на открытие: фиксируем body и сохраняем scroll в body.style.top
+ * - на закрытие: читаем scroll ИЗ body.style.top и возвращаем его синхронно
+ * - отключаем history.scrollRestoration на время модалки, чтобы браузер/Next не “помогали”
+ */
+function useLockBodyScroll(open: boolean, forcedScrollY?: number) {
+  const prevRestorationRef = useRef<ScrollRestoration | null>(null);
+  const prevHtmlScrollBehaviorRef = useRef<string>("");
 
   useEffect(() => {
     if (!open) return;
@@ -36,8 +49,21 @@ function useLockBodyScroll(open: boolean) {
     const body = document.body;
     const html = document.documentElement;
 
-    scrollYRef.current = window.scrollY;
+    // ✅ на время модалки запрещаем браузеру “восстанавливать” скролл самому
+    prevRestorationRef.current = window.history.scrollRestoration;
+    try {
+      window.history.scrollRestoration = "manual";
+    } catch {}
 
+    // ✅ выключаем smooth-scroll на время фиксации (иначе иногда даёт рывки)
+    prevHtmlScrollBehaviorRef.current = html.style.scrollBehavior;
+    html.style.scrollBehavior = "auto";
+
+    // ✅ какой скролл фиксируем
+    const y =
+      typeof forcedScrollY === "number" ? forcedScrollY : window.scrollY;
+
+    // ✅ сохраняем предыдущие inline-стили, чтобы вернуть как было
     const prev = {
       overflow: body.style.overflow,
       position: body.style.position,
@@ -52,13 +78,19 @@ function useLockBodyScroll(open: boolean) {
 
     body.style.overflow = "hidden";
     body.style.position = "fixed";
-    body.style.top = `-${scrollYRef.current}px`;
+    body.style.top = `-${y}px`;
     body.style.left = "0";
     body.style.right = "0";
     body.style.width = "100%";
     if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
 
     return () => {
+      // ✅ ВАЖНО: берём скролл из top (он всегда верный)
+      // body.style.top = "-1234px" => y = 1234
+      const top = body.style.top || "0";
+      const yFromTop = Math.abs(parseInt(top, 10) || 0);
+
+      // ✅ возвращаем стили как было
       body.style.overflow = prev.overflow;
       body.style.position = prev.position;
       body.style.top = prev.top;
@@ -67,9 +99,18 @@ function useLockBodyScroll(open: boolean) {
       body.style.width = prev.width;
       body.style.paddingRight = prev.paddingRight;
 
-      window.scrollTo(0, scrollYRef.current);
+      // ✅ синхронно возвращаем скролл (без rAF => нет кадра “прыжка”)
+      window.scrollTo(0, yFromTop);
+
+      // ✅ возвращаем настройки скролла назад
+      html.style.scrollBehavior = prevHtmlScrollBehaviorRef.current || "";
+      if (prevRestorationRef.current) {
+        try {
+          window.history.scrollRestoration = prevRestorationRef.current;
+        } catch {}
+      }
     };
-  }, [open]);
+  }, [open, forcedScrollY]);
 }
 
 function useRevealList(count: number) {
@@ -138,17 +179,19 @@ function Modal({
   title,
   children,
   onClose,
+  scrollY,
 }: {
   open: boolean;
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  scrollY?: number;
 }) {
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  useLockBodyScroll(open || closing);
+  useLockBodyScroll(open || closing, scrollY);
 
   // mount/unmount with exit animation
   useEffect(() => {
@@ -189,7 +232,12 @@ function Modal({
   const state = open && !closing ? "open" : "closed";
 
   return (
-    <div className="fixed inset-0 z-80" role="dialog" aria-modal="true" data-state={state}>
+    <div
+      className="fixed inset-0 z-80"
+      role="dialog"
+      aria-modal="true"
+      data-state={state}
+    >
       <button
         aria-label="Закрыть"
         className={cx(
@@ -280,7 +328,8 @@ function PriceList({
       </div>
 
       <p className="mt-3 text-xs text-black/45">
-        * Цена зависит от площади и сложности. Точную стоимость подтверждаем по телефону.
+        * Цена зависит от площади и сложности. Точную стоимость подтверждаем по
+        телефону.
       </p>
     </div>
   );
@@ -295,7 +344,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function BulletDot() {
-  return <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-black/50" />;
+  return (
+    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-black/50" />
+  );
 }
 
 export default function Services() {
@@ -397,6 +448,12 @@ export default function Services() {
 
   const current = openId ? services.find((s) => s.id === openId) : null;
 
+  // ✅ ESLint не ругается: state можно читать в рендере
+  const [modalScrollY, setModalScrollY] = useState(0);
+
+  // ✅ элемент (кнопка "Подробнее") — чтобы вернуть фокус без автоскролла
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+
   const accTopRef = useRef<HTMLDivElement | null>(null);
   const accFindingsRef = useRef<HTMLDivElement | null>(null);
   const accPrepRef = useRef<HTMLDivElement | null>(null);
@@ -423,7 +480,12 @@ export default function Services() {
     return () => window.clearTimeout(t);
   }, [current, acceptanceTarget]);
 
-  function openDetails(id: string) {
+  function openDetails(id: string, trigger?: HTMLElement) {
+    // ✅ важно: запоминаем всё ДО открытия
+    setModalScrollY(window.scrollY);
+    lastTriggerRef.current =
+      trigger ?? (document.activeElement as HTMLElement | null);
+
     if (id === "acceptance") setAcceptanceTarget("pricing");
     setOpenId(id);
   }
@@ -462,8 +524,8 @@ export default function Services() {
               "min-h-[360px] md:min-h-[380px] flex flex-col",
               "transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(0,0,0,0.12)]",
               // reveal
-                "opacity-0 translate-y-4 data-[revealed=true]:opacity-100 data-[revealed=true]:translate-y-0",
-                "motion-reduce:opacity-100 motion-reduce:translate-y-0",
+              "opacity-0 translate-y-4 data-[revealed=true]:opacity-100 data-[revealed=true]:translate-y-0",
+              "motion-reduce:opacity-100 motion-reduce:translate-y-0",
               "transition-[opacity,transform,box-shadow] duration-700",
               // featured gold hover (лёгкий)
               s.featured &&
@@ -487,7 +549,12 @@ export default function Services() {
               </div>
             ) : null}
 
-            <div className={cx("relative flex items-start gap-4 p-5", s.featured && "pt-4")}>
+            <div
+              className={cx(
+                "relative flex items-start gap-4 p-5",
+                s.featured && "pt-4"
+              )}
+            >
               <div className="grid h-14 w-14 place-items-center rounded-2xl border border-black/10 bg-white/70">
                 {s.icon}
               </div>
@@ -517,7 +584,7 @@ export default function Services() {
               </div>
             </div>
 
-            {/* ✅ FIX: цена не лезет на кнопки — фикс ширины + shrink-0 для кнопок */}
+            {/* цена и кнопки */}
             <div className="relative mt-auto border-t border-black/10 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="w-[132px] md:w-[140px]">
@@ -531,7 +598,7 @@ export default function Services() {
 
                 <div className="flex shrink-0 items-center gap-2">
                   <button
-                    onClick={() => openDetails(s.id)}
+                    onClick={(e) => openDetails(s.id, e.currentTarget)}
                     className={cx(
                       "cursor-pointer",
                       "rounded-full border border-black/12 bg-white/70 px-4 py-2 text-[13px] font-medium",
@@ -567,7 +634,22 @@ export default function Services() {
       <Modal
         open={!!current}
         title={current?.title ?? "Подробнее"}
-        onClose={() => setOpenId(null)}
+        scrollY={modalScrollY}
+        onClose={() => {
+          setOpenId(null);
+
+          // ✅ возвращаем фокус на кнопку "Подробнее" без автоскролла
+          requestAnimationFrame(() => {
+            const el: any = lastTriggerRef.current;
+            if (el?.focus) {
+              try {
+                el.focus({ preventScroll: true });
+              } catch {
+                el.focus();
+              }
+            }
+          });
+        }}
       >
         {current && (
           <div className="space-y-5">
@@ -609,8 +691,8 @@ export default function Services() {
                         1
                       </span>
                       <span>
-                        Осмотр по чек-листу: геометрия/отделка или основание, окна/двери,
-                        видимые инженерные узлы.
+                        Осмотр по чек-листу: геометрия/отделка или основание,
+                        окна/двери, видимые инженерные узлы.
                       </span>
                     </li>
                     <li className="flex gap-3">
@@ -618,7 +700,8 @@ export default function Services() {
                         2
                       </span>
                       <span>
-                        Фото/видео фиксация + формулировки замечаний понятным языком.
+                        Фото/видео фиксация + формулировки замечаний понятным
+                        языком.
                       </span>
                     </li>
                     <li className="flex gap-3">
@@ -626,8 +709,8 @@ export default function Services() {
                         3
                       </span>
                       <span>
-                        Перечень замечаний для застройщика + приоритеты: что критично и что исправить
-                        в первую очередь.
+                        Перечень замечаний для застройщика + приоритеты: что
+                        критично и что исправить в первую очередь.
                       </span>
                     </li>
                   </ol>
@@ -649,7 +732,8 @@ export default function Services() {
                     </li>
                     <li className="flex gap-2">
                       <BulletDot />
-                      Проблемы с окнами/дверями: регулировки, примыкания, фурнитура
+                      Проблемы с окнами/дверями: регулировки, примыкания,
+                      фурнитура
                     </li>
                     <li className="flex gap-2">
                       <BulletDot />
@@ -694,7 +778,8 @@ export default function Services() {
                     {
                       name: "Приёмка с отделкой",
                       price: "8 000 ₽",
-                      note: "Отделка + окна/двери + функциональные проверки сантехники/электрики.",
+                      note:
+                        "Отделка + окна/двери + функциональные проверки сантехники/электрики.",
                     },
                     {
                       name: "Повторная приёмка",
@@ -704,7 +789,8 @@ export default function Services() {
                     {
                       name: "Приёмка по доверенности",
                       price: "5 000 ₽",
-                      note: "Услуга после приёмки: примем без вашего присутствия по доверенности.",
+                      note:
+                        "Услуга после приёмки: примем без вашего присутствия по доверенности.",
                     },
                   ]}
                 />

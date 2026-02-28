@@ -16,7 +16,7 @@ import CookieBanner from "@/components/CookieBanner";
 type Social = {
   name: string;
   href: string;
-  icon: "tg" | "vk" | "ig";
+  icon: "tg" | "vk";
 };
 
 // ===== FORM (CLIENT REQUEST) =====
@@ -63,6 +63,240 @@ const normalizeArea = (v: string) => {
   return cleaned;
 };
 
+// ===== МОДАЛКА ДЛЯ ВЫБОРА ПОЧТЫ =====
+function cx(...v: Array<string | false | null | undefined>) {
+  return v.filter(Boolean).join(" ");
+}
+
+/**
+ * ✅ ЛОК СКРОЛЛА БЕЗ ДЁРГАНИЙ
+ */
+function useLockBodyScroll(open: boolean) {
+  const prevRestorationRef = useRef<ScrollRestoration | null>(null);
+  const prevHtmlScrollBehaviorRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    const body = document.body;
+    const html = document.documentElement;
+
+    // запрещаем браузеру “восстанавливать” скролл самому
+    prevRestorationRef.current = window.history.scrollRestoration;
+    try {
+      window.history.scrollRestoration = "manual";
+    } catch {}
+
+    // выключаем smooth на время модалки
+    prevHtmlScrollBehaviorRef.current = html.style.scrollBehavior;
+    html.style.scrollBehavior = "auto";
+
+    const y = window.scrollY;
+
+    const prev = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      paddingRight: body.style.paddingRight,
+    };
+
+    const scrollBarWidth = window.innerWidth - html.clientWidth;
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${y}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
+
+    return () => {
+      const top = body.style.top || "0";
+      const yFromTop = Math.abs(parseInt(top, 10) || 0);
+
+      body.style.overflow = prev.overflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.paddingRight = prev.paddingRight;
+
+      window.scrollTo(0, yFromTop);
+
+      html.style.scrollBehavior = prevHtmlScrollBehaviorRef.current || "";
+      if (prevRestorationRef.current) {
+        try {
+          window.history.scrollRestoration = prevRestorationRef.current;
+        } catch {}
+      }
+    };
+  }, [open]);
+}
+
+function MailModal({
+  open,
+  onClose,
+  mailtoLink,
+  webmail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  mailtoLink: string;
+  webmail: { gmail: string; yandex: string; mailru: string; outlook: string };
+}) {
+  const [mounted, setMounted] = useState(open);
+  const [closing, setClosing] = useState(false);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  useLockBodyScroll(open || closing);
+
+  // mount/unmount с анимацией
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      setClosing(false);
+      return;
+    }
+    if (mounted) {
+      setClosing(true);
+      const t = window.setTimeout(() => {
+        setClosing(false);
+        setMounted(false);
+      }, 180);
+      return () => window.clearTimeout(t);
+    }
+  }, [open, mounted]);
+
+  // ESC
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  // фокус на кнопку закрытия
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => closeBtnRef.current?.focus(), 30);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
+  if (!mounted) return null;
+  const state = open && !closing ? "open" : "closed";
+
+  return (
+    <div className="fixed inset-0 z-90" role="dialog" aria-modal="true" data-state={state}>
+      {/* фон */}
+      <button
+        aria-label="Закрыть"
+        className={cx(
+          "absolute inset-0 cursor-pointer bg-black/50 backdrop-blur-[6px]",
+          "transition duration-200",
+          "data-[state=closed]:opacity-0 data-[state=open]:opacity-100"
+        )}
+        onClick={onClose}
+      />
+
+      {/* окно */}
+      <div className="relative mx-auto mt-8 w-[min(560px,calc(100%-24px))] md:mt-14">
+        <div
+          className={cx(
+            "rounded-3xl border border-black/10 bg-white/92 backdrop-blur-xl",
+            "shadow-[0_30px_80px_rgba(0,0,0,0.25)]",
+            "transition duration-200 will-change-transform will-change-opacity",
+            state === "open" ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.985]"
+          )}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4 md:px-7">
+            <div className="min-w-0">
+              <div className="text-[12px] uppercase tracking-[0.18em] text-black/45">Отправить письмо</div>
+              <h3 className="mt-1 text-lg font-semibold leading-tight md:text-xl">Выберите почту</h3>
+              <p className="mt-1 text-sm text-black/55">Если почтовое приложение не настроено — используйте веб-почту.</p>
+            </div>
+
+            <button
+              ref={closeBtnRef}
+              onClick={onClose}
+              className={cx(
+                "shrink-0 rounded-full border border-black/10 bg-white/70 px-3 py-2 text-sm cursor-pointer",
+                "hover:bg-white transition",
+                "focus:outline-none focus:ring-2 focus:ring-black/10"
+              )}
+            >
+              Закрыть
+            </button>
+          </div>
+
+          <div className="px-5 py-5 md:px-7 md:py-6">
+            <div className="grid gap-3">
+              <a
+                href={mailtoLink}
+                className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 font-semibold hover:bg-white transition"
+              >
+                Почтовое приложение (mailto)
+                <div className="mt-1 text-xs font-normal text-black/55">Откроется Mail/Outlook, если настроено</div>
+              </a>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <a
+                  href={webmail.gmail}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 font-semibold hover:bg-white transition"
+                >
+                  Gmail
+                  <div className="mt-1 text-xs font-normal text-black/55">Откроется в новой вкладке</div>
+                </a>
+
+                <a
+                  href={webmail.yandex}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 font-semibold hover:bg-white transition"
+                >
+                  Яндекс.Почта
+                  <div className="mt-1 text-xs font-normal text-black/55">Откроется в новой вкладке</div>
+                </a>
+
+                <a
+                  href={webmail.mailru}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 font-semibold hover:bg-white transition"
+                >
+                  Mail.ru
+                  <div className="mt-1 text-xs font-normal text-black/55">Откроется в новой вкладке</div>
+                </a>
+
+                <a
+                  href={webmail.outlook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 font-semibold hover:bg-white transition"
+                >
+                  Outlook
+                  <div className="mt-1 text-xs font-normal text-black/55">Откроется в новой вкладке</div>
+                </a>
+              </div>
+
+              <div className="mt-2 text-xs text-black/45">
+                Подсказка: письмо уже заполнено данными из формы — останется только отправить.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const phoneDisplay = "+7 (978) 704-33-16";
   const phoneLink = "tel:+79787043316";
@@ -70,9 +304,8 @@ export default function Home() {
 
   const socials: Social[] = useMemo(
     () => [
-      { name: "Telegram", href: "#", icon: "tg" },
-      { name: "VK", href: "#", icon: "vk" },
-      { name: "Instagram", href: "#", icon: "ig" },
+      { name: "Telegram", href: "https://t.me/kontrolkachestvacrimea", icon: "tg" },
+      { name: "VK", href: "https://vk.com/kontrolkachestvacrimea", icon: "vk" },
     ],
     []
   );
@@ -94,8 +327,49 @@ export default function Home() {
   const [sending, setSending] = useState(false);
   const [sentOk, setSentOk] = useState<null | "ok" | "err">(null);
 
+  // ✅ модалка выбора почты
+  const [mailModalOpen, setMailModalOpen] = useState(false);
+
   const formId = useId();
   const addressInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ===== ПИСЬМО (тема/тело) =====
+  const mailSubject = useMemo(() => "Заявка на приёмку квартиры", []);
+
+  const mailBody = useMemo(() => {
+    const bodyLines = [
+      "Здравствуйте! Хочу записаться на приёмку квартиры.",
+      "",
+      `ФИО: ${form.fio.trim() || "-"}`,
+      `Телефон: ${form.phone.trim() || "-"}`,
+      `Город и адрес ЖК: ${form.address.trim() || "-"}`,
+      `Площадь (м²): ${form.area.trim() || "-"}`,
+      `Дата и время осмотра: ${form.datetime.trim() || "-"}`,
+      `Комментарий: ${form.comment.trim() || "-"}`,
+      "",
+      `Страница: ${typeof window !== "undefined" ? window.location.href : ""}`,
+    ];
+    return bodyLines.join("\n");
+  }, [form]);
+
+  // ===== MAILTO (автоподстановка данных из формы) =====
+  const mailtoLink = useMemo(() => {
+    return `mailto:${email}?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;
+  }, [email, mailSubject, mailBody]);
+
+  // ===== ВЕБ-ПОЧТЫ (работают всегда) =====
+  const webmail = useMemo(() => {
+    const to = encodeURIComponent(email);
+    const su = encodeURIComponent(mailSubject);
+    const body = encodeURIComponent(mailBody);
+
+    return {
+      gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${su}&body=${body}`,
+      yandex: `https://mail.yandex.ru/compose?to=${to}&subject=${su}&body=${body}`,
+      mailru: `https://e.mail.ru/compose/?to=${to}&subject=${su}&body=${body}`,
+      outlook: `https://outlook.live.com/mail/0/deeplink/compose?to=${to}&subject=${su}&body=${body}`,
+    };
+  }, [email, mailSubject, mailBody]);
 
   const validate = (s: FormState): FormErrors => {
     const e: FormErrors = {};
@@ -132,7 +406,8 @@ export default function Home() {
     ].join(" ");
   };
 
-  const submit = async () => {
+  // ✅ submit теперь принимает fallbackMailto (чтобы заявка не потерялась)
+  const submit = async (fallbackMailto: string) => {
     setSentOk(null);
 
     const nextErrors = validate(form);
@@ -163,7 +438,7 @@ export default function Home() {
           (form.comment.trim() ? `Комментарий: ${form.comment.trim()}` : ""),
       };
 
-      const res = await fetch("/api/lead", {
+      const res = await fetch("/send.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -185,6 +460,15 @@ export default function Home() {
       setErrors({});
     } catch {
       setSentOk("err");
+
+      // ✅ если API не отправилось — откроем модалку выбора почты
+      if (typeof window !== "undefined") {
+        // пробуем mailto (вдруг настроено)
+        window.location.href = fallbackMailto;
+
+        // и сразу даём “план Б” — модалку с веб-почтами
+        setMailModalOpen(true);
+      }
     } finally {
       setSending(false);
     }
@@ -236,7 +520,7 @@ export default function Home() {
       {
         n: "02",
         title: "Город и адрес ЖК",
-        hint: 'Например: Евпатория, ЖК «Мойнаки», ул. …',
+        hint: "Например: Евпатория, ЖК «Мойнаки», ул. …",
         done: form.address.trim().length > 6,
       },
       {
@@ -257,6 +541,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white text-black">
+      {/* ✅ МОДАЛКА ВЫБОРА ПОЧТЫ */}
+      <MailModal open={mailModalOpen} onClose={() => setMailModalOpen(false)} mailtoLink={mailtoLink} webmail={webmail} />
+
       {/* ========================= HEADER ========================= */}
       <header className="z-40">
         {/* top white */}
@@ -280,10 +567,7 @@ export default function Home() {
 
               {/* desktop */}
               <div className="hidden items-center justify-end gap-5 md:flex">
-                <a
-                  href={phoneLink}
-                  className="whitespace-nowrap text-lg font-extrabold tracking-tight text-black hover:underline"
-                >
+                <a href={phoneLink} className="whitespace-nowrap text-lg font-extrabold tracking-tight text-black hover:underline">
                   {phoneDisplay}
                 </a>
 
@@ -292,12 +576,11 @@ export default function Home() {
                     <a
                       key={s.name}
                       href={s.href}
-                      onClick={(e) => {
-                        if (s.href === "#") e.preventDefault();
-                      }}
-                      className="group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition hover:opacity-90"
-                      aria-label={`${s.name} (скоро)`}
-                      title={`${s.name} — скоро`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition hover:opacity-90"
+                      aria-label={s.name}
+                      title={s.name}
                     >
                       {s.icon === "tg" && (
                         <svg
@@ -309,23 +592,14 @@ export default function Home() {
                           <path d="M9.9 16.6l-.4 4.2c.6 0 .9-.3 1.2-.6l2.8-2.6 5.8 4.2c1.1.6 1.8.3 2.1-1l3.8-17.8c.4-1.6-.6-2.2-1.6-1.8L1.6 9.3c-1.5.6-1.5 1.5-.3 1.9l5.6 1.8 13-8.2c.6-.4 1.2-.2.8.2L9.9 16.6z" />
                         </svg>
                       )}
+
                       {s.icon === "vk" && (
                         <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
                           <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
                         </svg>
                       )}
-                      {s.icon === "ig" && (
-                        <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
-                          <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm10 2H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm-5 4.2A3.8 3.8 0 1 1 8.2 12 3.8 3.8 0 0 1 12 8.2zm0 2A1.8 1.8 0 1 0 13.8 12 1.8 1.8 0 0 0 12 10.2zM17.7 6.1a1 1 0 1 1-1 1 1 1 0 0 1 1-1z" />
-                        </svg>
-                      )}
-
-                      <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black px-3 py-1 text-[11px] font-extrabold text-white opacity-0 shadow-lg transition group-hover:opacity-100">
-                        Скоро
-                      </span>
                     </a>
                   ))}
-                  <span className="text-lg font-black text-black">*</span>
                 </div>
               </div>
 
@@ -334,12 +608,7 @@ export default function Home() {
                 <a href={phoneLink} className="btn-outline px-4 py-3 text-sm">
                   Позвонить
                 </a>
-                <button
-                  type="button"
-                  onClick={() => setMobileMenu(true)}
-                  className="btn-outline px-4 py-3"
-                  aria-label="Открыть меню"
-                >
+                <button type="button" onClick={() => setMobileMenu(true)} className="btn-outline px-4 py-3" aria-label="Открыть меню">
                   ☰
                 </button>
               </div>
@@ -387,12 +656,7 @@ export default function Home() {
         {/* mobile drawer */}
         {mobileMenu ? (
           <div className="md:hidden">
-            <button
-              type="button"
-              className="fixed inset-0 z-50 bg-black/50"
-              onClick={() => setMobileMenu(false)}
-              aria-label="Закрыть меню"
-            />
+            <button type="button" className="fixed inset-0 z-50 bg-black/50" onClick={() => setMobileMenu(false)} aria-label="Закрыть меню" />
             <div className="fixed right-0 top-0 z-50 h-full w-[85%] max-w-sm bg-white p-6 shadow-xl">
               <div className="flex items-center justify-between">
                 <div className="text-lg font-extrabold">Меню</div>
@@ -430,6 +694,31 @@ export default function Home() {
                   </a>
                   <div className="mt-1 text-sm text-black/60">{email}</div>
                 </div>
+
+                {/* мобильные соцсети тоже кликабельные */}
+                <div className="mt-5 flex items-center gap-3">
+                  {socials.map((s) => (
+                    <a
+                      key={s.name}
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black text-white transition hover:opacity-90"
+                      aria-label={s.name}
+                      title={s.name}
+                    >
+                      {s.icon === "tg" ? (
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                          <path d="M9.9 16.6l-.4 4.2c.6 0 .9-.3 1.2-.6l2.8-2.6 5.8 4.2c1.1.6 1.8.3 2.1-1l3.8-17.8c.4-1.6-.6-2.2-1.6-1.8L1.6 9.3c-1.5.6-1.5 1.5-.3 1.9l5.6 1.8 13-8.2c.6-.4 1.2-.2.8.2L9.9 16.6z" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                          <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
+                        </svg>
+                      )}
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -454,9 +743,7 @@ export default function Home() {
               <div className="flex flex-col justify-between rounded-4xl border border-black/10 bg-white/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.08)] backdrop-blur-xl md:p-8 transition duration-300 hover:shadow-[0_28px_90px_rgba(255,196,0,0.18)]">
                 <div>
                   <div className="flex flex-wrap gap-3">
-                    <span className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">
-                      Работаем по всему Крыму
-                    </span>
+                    <span className="inline-flex rounded-full bg-black px-4 py-2 text-xs font-bold text-white">Работаем по всему Крыму</span>
                     <span className="inline-flex rounded-full bg-[#ffc400] px-4 py-2 text-xs font-bold text-black shadow-[0_14px_45px_rgba(255,196,0,0.22)]">
                       Акт замечаний для застройщика
                     </span>
@@ -472,8 +759,7 @@ export default function Home() {
                   </h1>
 
                   <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/65 md:text-base">
-                    Проверим качество отделки, инженерные системы и площадь. Составим акт замечаний и подскажем, как
-                    добиться устранения дефектов.
+                    Проверим качество отделки, инженерные системы и площадь. Составим акт замечаний и подскажем, как добиться устранения дефектов.
                   </p>
 
                   <div className="mt-7 flex flex-wrap gap-3">
@@ -494,10 +780,7 @@ export default function Home() {
                       { top: "50+ пунктов", bottom: "проверки" },
                       { top: "Фото/видео", bottom: "фиксация" },
                     ].map((x) => (
-                      <div
-                        key={x.top}
-                        className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
-                      >
+                      <div key={x.top} className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
                         <div className="font-extrabold text-black">{x.top}</div>
                         <div className="text-black/55">{x.bottom}</div>
                       </div>
@@ -593,15 +876,11 @@ export default function Home() {
                     Заявка
                   </div>
 
-                  <h2 className="mt-5 text-3xl font-extrabold tracking-tight md:text-5xl">
-                    Запись на приёмку и расчёт стоимости
-                  </h2>
+                  <h2 className="mt-5 text-3xl font-extrabold tracking-tight md:text-5xl">Запись на приёмку и расчёт стоимости</h2>
 
-                  <p className="mt-4 max-w-xl text-black/60">
-                    Чтобы оперативно записать вас и точно рассчитать стоимость, заполните 4 пункта ниже.
-                  </p>
+                  <p className="mt-4 max-w-xl text-black/60">Чтобы оперативно записать вас и точно рассчитать стоимость, заполните 4 пункта ниже.</p>
 
-                  {/* чек-лист (дорого) */}
+                  {/* чек-лист */}
                   <div className="mt-7 grid max-w-xl gap-3">
                     {checklist.map((c) => (
                       <div
@@ -609,9 +888,7 @@ export default function Home() {
                         className={[
                           "group relative overflow-hidden rounded-3xl border bg-white/70 px-5 py-4 backdrop-blur-xl",
                           "transition duration-300",
-                          c.done
-                            ? "border-black/10 shadow-[0_14px_45px_rgba(255,196,0,0.16)]"
-                            : "border-black/10 shadow-[0_12px_40px_rgba(0,0,0,0.05)]",
+                          c.done ? "border-black/10 shadow-[0_14px_45px_rgba(255,196,0,0.16)]" : "border-black/10 shadow-[0_12px_40px_rgba(0,0,0,0.05)]",
                         ].join(" ")}
                       >
                         <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100">
@@ -650,14 +927,26 @@ export default function Home() {
                       </a>
                     </div>
 
+                    {/* ✅ ПОЧТА */}
                     <a
-                      href={`mailto:${email}?subject=${encodeURIComponent("Заявка на приёмку квартиры")}`}
+                      href={mailtoLink}
                       className="group block rounded-2xl border border-black/10 bg-black/[0.02] px-5 py-4 transition hover:bg-black/[0.035] focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40"
                       aria-label="Написать на почту"
                     >
                       <div className="text-xs font-bold text-black/45">Почта</div>
-                      <div className="mt-1 text-lg font-extrabold tracking-tight text-black underline-offset-4 group-hover:underline">
-                        {email}
+                      <div className="mt-1 text-lg font-extrabold tracking-tight text-black underline-offset-4 group-hover:underline">{email}</div>
+                      <div className="mt-2 text-xs text-black/55">
+                        Если не открылось —{" "}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setMailModalOpen(true);
+                          }}
+                          className="font-bold underline underline-offset-2 hover:text-black cursor-pointer"
+                        >
+                          выберите почту
+                        </button>
                       </div>
                     </a>
 
@@ -671,9 +960,7 @@ export default function Home() {
                     <div
                       className={[
                         "mb-4 rounded-2xl border p-4 text-sm",
-                        sentOk === "ok"
-                          ? "border-black/10 bg-[#ffc400]/12 text-black"
-                          : "border-black/10 bg-black/5 text-black",
+                        sentOk === "ok" ? "border-black/10 bg-[#ffc400]/12 text-black" : "border-black/10 bg-black/5 text-black",
                       ].join(" ")}
                     >
                       {sentOk === "ok" ? (
@@ -693,7 +980,7 @@ export default function Home() {
                     className="grid gap-4"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (!sending) submit();
+                      if (!sending) submit(mailtoLink);
                     }}
                   >
                     <label className="group/field relative">
@@ -712,11 +999,7 @@ export default function Home() {
                         placeholder="Например: Иванов Иван Иванович"
                         className={softFieldClass("fio")}
                       />
-                      {touched.fio && errors.fio ? (
-                        <div className="mt-2 text-xs text-black/50">{errors.fio}</div>
-                      ) : (
-                        <div className="mt-2 text-xs text-black/30"> </div>
-                      )}
+                      {touched.fio && errors.fio ? <div className="mt-2 text-xs text-black/50">{errors.fio}</div> : <div className="mt-2 text-xs text-black/30"> </div>}
                     </label>
 
                     <label className="group/field relative">
@@ -736,11 +1019,7 @@ export default function Home() {
                         placeholder="+7 (___) ___-__-__"
                         className={softFieldClass("phone")}
                       />
-                      {touched.phone && errors.phone ? (
-                        <div className="mt-2 text-xs text-black/50">{errors.phone}</div>
-                      ) : (
-                        <div className="mt-2 text-xs text-black/30"> </div>
-                      )}
+                      {touched.phone && errors.phone ? <div className="mt-2 text-xs text-black/50">{errors.phone}</div> : <div className="mt-2 text-xs text-black/30"> </div>}
                     </label>
 
                     <label className="group/field relative">
@@ -760,11 +1039,7 @@ export default function Home() {
                         placeholder='Например: Евпатория, ЖК "Мойнаки", ул. 50 лет СССР, дом 20, кв.35'
                         className={softFieldClass("address")}
                       />
-                      {touched.address && errors.address ? (
-                        <div className="mt-2 text-xs text-black/50">{errors.address}</div>
-                      ) : (
-                        <div className="mt-2 text-xs text-black/30"> </div>
-                      )}
+                      {touched.address && errors.address ? <div className="mt-2 text-xs text-black/50">{errors.address}</div> : <div className="mt-2 text-xs text-black/30"> </div>}
                     </label>
 
                     <div className="grid gap-4 md:grid-cols-2">
@@ -785,11 +1060,7 @@ export default function Home() {
                           placeholder="Например: 75.5"
                           className={softFieldClass("area")}
                         />
-                        {touched.area && errors.area ? (
-                          <div className="mt-2 text-xs text-black/50">{errors.area}</div>
-                        ) : (
-                          <div className="mt-2 text-xs text-black/30"> </div>
-                        )}
+                        {touched.area && errors.area ? <div className="mt-2 text-xs text-black/50">{errors.area}</div> : <div className="mt-2 text-xs text-black/30"> </div>}
                       </label>
 
                       <label className="group/field relative">
@@ -845,6 +1116,18 @@ export default function Home() {
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-black/60" />
                       <span className="text-sm font-bold text-black/70">быстро</span>
                     </button>
+
+                    {/* ✅ ОДНА ссылка вместо 5 — открывает модалку */}
+                    <div className="text-center text-xs text-black/55">
+                      Не открывается?{" "}
+                      <button
+                        type="button"
+                        onClick={() => setMailModalOpen(true)}
+                        className="font-bold underline underline-offset-2 hover:text-black cursor-pointer"
+                      >
+                        Отправить письмом
+                      </button>
+                    </div>
 
                     <div id={formId} className="text-center text-xs text-black/50">
                       Нажимая «Отправить», вы соглашаетесь на{" "}
