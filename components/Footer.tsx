@@ -178,15 +178,15 @@ export default function Footer() {
             </div>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-white/55">
-              <Link className="transition hover:text-white/85" href="/privacy">
+              <Link className="transition hover:text-white/85" href="/privacy/">
                 Политика
               </Link>
               <span className="text-white/25">•</span>
-              <Link className="transition hover:text-white/85" href="/consent">
+              <Link className="transition hover:text-white/85" href="/consent/">
                 Согласие ПДн
               </Link>
               <span className="text-white/25">•</span>
-              <Link className="transition hover:text-white/85" href="/cookies">
+              <Link className="transition hover:text-white/85" href="/cookies/">
                 Cookies
               </Link>
               <span className="text-white/25">•</span>
@@ -202,11 +202,11 @@ export default function Footer() {
 
           <div className="mt-3 text-[11px] leading-relaxed text-white/45">
             Отправляя форму, вы соглашаетесь с{" "}
-            <Link className="underline underline-offset-2 hover:text-white/70" href="/consent">
+            <Link className="underline underline-offset-2 hover:text-white/70" href="/consent/">
               обработкой персональных данных
             </Link>{" "}
             и{" "}
-            <Link className="underline underline-offset-2 hover:text-white/70" href="/privacy">
+            <Link className="underline underline-offset-2 hover:text-white/70" href="/privacy/">
               политикой конфиденциальности
             </Link>
             .

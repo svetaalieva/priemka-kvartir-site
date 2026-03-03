@@ -81,11 +81,11 @@ export default function CookieBanner() {
               <div className="text-sm font-extrabold text-black">Cookies</div>
               <p className="mt-1 text-sm text-black/60">
                 Мы используем cookies для работы сайта. Подробнее — в{" "}
-                <Link href="/cookies" className="font-bold underline underline-offset-2 hover:text-black">
+                <Link href="/cookies/" className="font-bold underline underline-offset-2 hover:text-black">
                   политике cookies
                 </Link>{" "}
                 и{" "}
-                <Link href="/privacy" className="font-bold underline underline-offset-2 hover:text-black">
+                <Link href="/privacy/" className="font-bold underline underline-offset-2 hover:text-black">
                   политике конфиденциальности
                 </Link>
                 .

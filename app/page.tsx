@@ -81,13 +81,11 @@ function useLockBodyScroll(open: boolean) {
     const body = document.body;
     const html = document.documentElement;
 
-    // запрещаем браузеру “восстанавливать” скролл самому
     prevRestorationRef.current = window.history.scrollRestoration;
     try {
       window.history.scrollRestoration = "manual";
     } catch {}
 
-    // выключаем smooth на время модалки
     prevHtmlScrollBehaviorRef.current = html.style.scrollBehavior;
     html.style.scrollBehavior = "auto";
 
@@ -154,7 +152,6 @@ function MailModal({
 
   useLockBodyScroll(open || closing);
 
-  // mount/unmount с анимацией
   useEffect(() => {
     if (open) {
       setMounted(true);
@@ -171,7 +168,6 @@ function MailModal({
     }
   }, [open, mounted]);
 
-  // ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -181,7 +177,6 @@ function MailModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // фокус на кнопку закрытия
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() => closeBtnRef.current?.focus(), 30);
@@ -193,7 +188,6 @@ function MailModal({
 
   return (
     <div className="fixed inset-0 z-90" role="dialog" aria-modal="true" data-state={state}>
-      {/* фон */}
       <button
         aria-label="Закрыть"
         className={cx(
@@ -204,7 +198,6 @@ function MailModal({
         onClick={onClose}
       />
 
-      {/* окно */}
       <div className="relative mx-auto mt-8 w-[min(560px,calc(100%-24px))] md:mt-14">
         <div
           className={cx(
@@ -296,13 +289,7 @@ function MailModal({
 }
 
 /** ✅ Лейбл с пометкой обязательности (не ломает верстку) */
-function FieldLabel({
-  children,
-  required,
-}: {
-  children: React.ReactNode;
-  required?: boolean;
-}) {
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <span className="mb-2 block text-xs font-bold text-black/60">
       {children}
@@ -330,7 +317,6 @@ export default function Home() {
 
   const [mobileMenu, setMobileMenu] = useState(false);
 
-  // ===== FORM STATE =====
   const [form, setForm] = useState<FormState>({
     fio: "",
     phone: "",
@@ -345,13 +331,11 @@ export default function Home() {
   const [sending, setSending] = useState(false);
   const [sentOk, setSentOk] = useState<null | "ok" | "err">(null);
 
-  // ✅ модалка выбора почты
   const [mailModalOpen, setMailModalOpen] = useState(false);
 
   const formId = useId();
   const addressInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ===== ПИСЬМО (тема/тело) =====
   const mailSubject = useMemo(() => "Заявка на приёмку квартиры", []);
 
   const mailBody = useMemo(() => {
@@ -370,12 +354,10 @@ export default function Home() {
     return bodyLines.join("\n");
   }, [form]);
 
-  // ===== MAILTO (автоподстановка данных из формы) =====
   const mailtoLink = useMemo(() => {
     return `mailto:${email}?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailBody)}`;
   }, [email, mailSubject, mailBody]);
 
-  // ===== ВЕБ-ПОЧТЫ (работают всегда) =====
   const webmail = useMemo(() => {
     const to = encodeURIComponent(email);
     const su = encodeURIComponent(mailSubject);
@@ -424,7 +406,6 @@ export default function Home() {
     ].join(" ");
   };
 
-  // ✅ submit теперь принимает fallbackMailto (чтобы заявка не потерялась)
   const submit = async (fallbackMailto: string) => {
     setSentOk(null);
 
@@ -444,7 +425,6 @@ export default function Home() {
         area: form.area.trim(),
         datetime: form.datetime.trim(),
         comment: form.comment.trim(),
-        // на всякий случай под старый API:
         name: form.fio.trim(),
         city: form.address.trim(),
         page: typeof window !== "undefined" ? window.location.href : "",
@@ -472,19 +452,13 @@ export default function Home() {
         area: "",
         datetime: "",
         comment: "",
-        // address оставим (удобно для повторных заявок)
       }));
       setTouched({});
       setErrors({});
     } catch {
       setSentOk("err");
-
-      // ✅ если API не отправилось — откроем модалку выбора почты
       if (typeof window !== "undefined") {
-        // пробуем mailto (вдруг настроено)
         window.location.href = fallbackMailto;
-
-        // и сразу даём “план Б” — модалку с веб-почтами
         setMailModalOpen(true);
       }
     } finally {
@@ -492,7 +466,6 @@ export default function Home() {
     }
   };
 
-  // ===== AUTO-FILL FROM GEO =====
   useEffect(() => {
     const handler = (evt: Event) => {
       const e = evt as CustomEvent<{ city?: string }>;
@@ -526,57 +499,29 @@ export default function Home() {
     return () => window.removeEventListener("geo:city", handler as EventListener);
   }, []);
 
-  // ===== CHECKLIST (слева) =====
   const checklist = useMemo(
     () => [
-      {
-        n: "01",
-        title: "Полное ФИО дольщика",
-        hint: "Например: Иванов Иван Иванович",
-        done: form.fio.trim().length > 2,
-      },
-      {
-        n: "02",
-        title: "Город и адрес ЖК",
-        hint: "Например: Евпатория, ЖК «Мойнаки», ул. …",
-        done: form.address.trim().length > 6,
-      },
-      {
-        n: "03",
-        title: "Общая площадь",
-        hint: "Например: 75.5 м²",
-        done: form.area.trim().length > 0 && !errors.area,
-      },
-      {
-        n: "04",
-        title: "Дата и время осмотра",
-        hint: "Например: 20.10.2025 12:00",
-        done: form.datetime.trim().length > 0,
-      },
+      { n: "01", title: "Полное ФИО дольщика", hint: "Например: Иванов Иван Иванович", done: form.fio.trim().length > 2 },
+      { n: "02", title: "Город и адрес ЖК", hint: "Например: Евпатория, ЖК «Мойнаки», ул. …", done: form.address.trim().length > 6 },
+      { n: "03", title: "Общая площадь", hint: "Например: 75.5 м²", done: form.area.trim().length > 0 && !errors.area },
+      { n: "04", title: "Дата и время осмотра", hint: "Например: 20.10.2025 12:00", done: form.datetime.trim().length > 0 },
     ],
     [form.fio, form.address, form.area, form.datetime, errors.area]
   );
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      {/* ✅ МОДАЛКА ВЫБОРА ПОЧТЫ */}
+    <div className="min-h-screen bg-white text-black overflow-x-clip">
       <MailModal open={mailModalOpen} onClose={() => setMailModalOpen(false)} mailtoLink={mailtoLink} webmail={webmail} />
 
       {/* ========================= HEADER ========================= */}
       <header className="z-40">
-        {/* top white */}
         <div className="border-b border-black/10 bg-white">
           <div className="site-container">
             <div className="flex items-center justify-between gap-4 py-3 md:py-4">
-              <Link
-                href="/"
-                aria-label="На главную"
-                className="inline-flex items-center rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc400]/60"
-              >
+              <Link href="/" aria-label="На главную" className="inline-flex items-center rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ffc400]/60">
                 <Image src="/brand/logo-horizontal.png" alt="Контроль качества" width={520} height={140} priority className="h-12 w-auto md:h-16" />
               </Link>
 
-              {/* desktop */}
               <div className="hidden items-center justify-end gap-5 md:flex">
                 <a href={phoneLink} className="whitespace-nowrap text-lg font-extrabold tracking-tight text-black hover:underline">
                   {phoneDisplay}
@@ -594,16 +539,10 @@ export default function Home() {
                       title={s.name}
                     >
                       {s.icon === "tg" && (
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="block h-5 w-5 origin-center transform-gpu scale-[0.90] -translate-x-[2px] translate-y-[1px]"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
+                        <svg viewBox="0 0 24 24" className="block h-5 w-5 origin-center transform-gpu scale-[0.90] -translate-x-[2px] translate-y-[1px]" fill="currentColor" aria-hidden="true">
                           <path d="M9.9 16.6l-.4 4.2c.6 0 .9-.3 1.2-.6l2.8-2.6 5.8 4.2c1.1.6 1.8.3 2.1-1l3.8-17.8c.4-1.6-.6-2.2-1.6-1.8L1.6 9.3c-1.5.6-1.5 1.5-.3 1.9l5.6 1.8 13-8.2c.6-.4 1.2-.2.8.2L9.9 16.6z" />
                         </svg>
                       )}
-
                       {s.icon === "vk" && (
                         <svg viewBox="0 0 24 24" className="block h-5 w-5" fill="currentColor" aria-hidden="true">
                           <path d="M12.8 17.3h1.2s.4 0 .6-.2c.2-.2.2-.5.2-.5s0-1.6.7-1.8c.7-.2 1.6 1.5 2.5 2.1.7.5 1.3.4 1.3.4l2.6-.1s1.4-.1.7-1.2c-.1-.1-.5-1-2.6-3-.2-.2-.5-.6-.2-1.1.3-.4 2.2-3 2.5-4 .2-.7-.3-.7-.3-.7l-2.9.1s-.4-.1-.7.1c-.3.2-.4.5-.4.5s-.5 1.4-1.2 2.6c-1.5 2.4-2.1 2.5-2.4 2.3-.7-.4-.5-1.6-.5-2.4 0-2.6.4-3.7-.8-4-.4-.1-.7-.2-1.7-.2-1.3 0-2.3 0-2.9.3-.4.2-.7.6-.5.6.3 0 .9.2 1.2.6.4.6.4 1.9.4 1.9s.2 3.1-.4 3.5c-.4.3-.9-.3-2-2.3-.6-1.2-1-2.5-1-2.5s-.1-.3-.4-.5c-.3-.2-.7-.2-.7-.2l-2.7.1s-.4 0-.5.2c-.2.2 0 .6 0 .6s2.1 4.8 4.6 7.2c2.3 2.2 4.9 2 4.9 2z" />
@@ -614,7 +553,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* mobile */}
               <div className="flex items-center justify-end gap-3 md:hidden">
                 <a href={phoneLink} className="btn-outline px-4 py-3 text-sm">
                   Позвонить
@@ -627,7 +565,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* sticky black nav */}
         <div className="sticky top-0 bg-black text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
           <div className="site-container">
             <nav className="hidden items-center gap-8 py-3 text-sm font-extrabold uppercase tracking-wide md:flex">
@@ -664,7 +601,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* mobile drawer */}
         {mobileMenu ? (
           <div className="md:hidden">
             <button type="button" className="fixed inset-0 z-50 bg-black/50" onClick={() => setMobileMenu(false)} aria-label="Закрыть меню" />
@@ -706,7 +642,6 @@ export default function Home() {
                   <div className="mt-1 text-sm text-black/60">{email}</div>
                 </div>
 
-                {/* мобильные соцсети тоже кликабельные */}
                 <div className="mt-5 flex items-center gap-3">
                   {socials.map((s) => (
                     <a
@@ -812,7 +747,7 @@ export default function Home() {
               </div>
 
               {/* RIGHT */}
-              <div className="relative mx-auto w-full max-w-95 md:mt-0">
+              <div className="relative mx-auto w-full max-w-[380px] md:mt-0">
                 <div className="pointer-events-none absolute -left-2 top-2 h-[calc(100%-8px)] w-[calc(100%+8px)] rounded-4xl bg-[linear-gradient(180deg,rgba(255,196,0,0.95),rgba(255,196,0,0.55))] shadow-[0_22px_70px_rgba(255,196,0,0.25)]" />
                 <div className="pointer-events-none absolute -left-3 top-3 h-[calc(100%-12px)] w-[calc(100%+12px)] rounded-4xl bg-[#ffc400]/25 blur-[12px]" />
 
@@ -824,7 +759,7 @@ export default function Home() {
                   <div className="pointer-events-none absolute inset-0 rounded-4xl shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)]" />
 
                   <div className="p-4 md:p-5">
-                    <div className="mx-auto w-full max-w-85">
+                    <div className="mx-auto w-full max-w-[340px]">
                       <div className="relative overflow-hidden rounded-4xl bg-black/5">
                         <Image
                           src="/brand/sergey.jpg"
@@ -894,7 +829,6 @@ export default function Home() {
 
                   <p className="mt-4 max-w-xl text-black/60">Чтобы оперативно записать вас и точно рассчитать стоимость, заполните 4 пункта ниже.</p>
 
-                  {/* чек-лист */}
                   <div className="mt-7 grid max-w-xl gap-3">
                     {checklist.map((c) => (
                       <div
@@ -941,7 +875,6 @@ export default function Home() {
                       </a>
                     </div>
 
-                    {/* ✅ ПОЧТА */}
                     <a
                       href={mailtoLink}
                       className="group block rounded-2xl border border-black/10 bg-black/[0.02] px-5 py-4 transition hover:bg-black/[0.035] focus:outline-none focus:ring-2 focus:ring-[#ffc400]/40"
@@ -1132,7 +1065,6 @@ export default function Home() {
                       <span className="text-sm font-bold text-black/70">быстро</span>
                     </button>
 
-                    {/* ✅ ОДНА ссылка вместо 5 — открывает модалку */}
                     <div className="text-center text-xs text-black/55">
                       Не открывается?{" "}
                       <button type="button" onClick={() => setMailModalOpen(true)} className="font-bold underline underline-offset-2 hover:text-black cursor-pointer">
@@ -1142,11 +1074,11 @@ export default function Home() {
 
                     <div id={formId} className="text-center text-xs text-black/50">
                       Нажимая «Отправить», вы соглашаетесь на{" "}
-                      <Link className="underline underline-offset-2 hover:text-black" href="/consent">
+                      <Link className="underline underline-offset-2 hover:text-black" href="/consent/">
                         обработку персональных данных
                       </Link>{" "}
                       и принимаете{" "}
-                      <Link className="underline underline-offset-2 hover:text-black" href="/privacy">
+                      <Link className="underline underline-offset-2 hover:text-black" href="/privacy/">
                         политику конфиденциальности
                       </Link>
                       .

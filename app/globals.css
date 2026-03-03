@@ -17,13 +17,19 @@
   --focus: 0 0 0 4px rgba(255, 196, 0, 0.25);
 }
 
+/* БАЗА */
 html,
 body {
   height: 100%;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-html {
-  scroll-behavior: smooth;
+@supports (overflow: clip) {
+  html,
+  body {
+    overflow-x: clip;
+  }
 }
 
 body {
@@ -33,7 +39,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.h-brand, h1, h2, h3 {
+/* ⚠️ НЕ ставим глобальный smooth (меньше багов на iOS)
+html { scroll-behavior: smooth; }
+*/
+
+.h-brand,
+h1,
+h2,
+h3 {
   font-family: var(--font-montserrat), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
@@ -153,14 +166,10 @@ body {
   transform-box: fill-box;
   transform-origin: center;
 }
-/* =========================
-   Premium scrollbar (yellow)
-   ========================= */
-
 
 /* =========================
    Premium scrollbar (yellow)
-   ========================= */
+========================= */
 
 /* Chrome / Edge / Safari */
 html::-webkit-scrollbar,
@@ -194,6 +203,7 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 196, 0, 0.75) transparent;
 }
+
 /* Fix: убрать овальные/круглые подложки у галочки в Advantages */
 #advantages .adv-check-wrap {
   background: transparent !important;
